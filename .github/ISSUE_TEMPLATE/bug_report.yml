@@ -1,0 +1,77 @@
+name: Bug Report
+description: Let us know about an unexpected error, crash, or incorrect behavior.
+labels: ["bug", "new"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # Thank you for opening a bug report.
+
+        This issue tracker is reserved for reporting bugs that affect the core functionality of the project.
+        For general questions or usage support, please visit our documentation or contact support.
+  - type: dropdown
+    attributes:
+      label: Which component are you experiencing issues with?
+      description: Select the component that is causing the issue.
+      options:
+        - internal
+        - pkg
+        - cmd
+        - other (please specify)
+  - type: textarea
+    id: version
+    attributes:
+      label: Version
+      description: Please provide the version information.
+      render: shell
+      placeholder: e.g. `v1.0.0`
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps to Reproduce
+      description: List the steps required to reproduce the issue.
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+      placeholder: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: What happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Please provide details about your environment.
+      placeholder: |
+        OS: [e.g. Ubuntu 22.04]
+        Go version: [e.g. 1.22]
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any extra context that might help us investigate the issue.
+      placeholder: Additional context...
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        **Note:** Ensure you have provided a **Title** for the issue. If the submit button is disabled after filling out the required fields, double-check your title. 

@@ -1,0 +1,71 @@
+name: Release To Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Type of version increment'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for full history and tags
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Calculate next version
+        id: next_version
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0 || echo "v0.0.0")
+          echo "Latest tag: $latest_tag"
+
+          latest_version="${latest_tag#v}"
+          major=$(echo "$latest_version" | cut -d. -f1)
+          minor=$(echo "$latest_version" | cut -d. -f2)
+          patch=$(echo "$latest_version" | cut -d. -f3)
+
+          case "${{ github.event.inputs.version_type }}" in
+            major)
+              next_version="$((major + 1)).0.0"
+              ;;
+            minor)
+              next_version="$major.$((minor + 1)).0"
+              ;;
+            patch)
+              next_version="$major.$minor.$((patch + 1))"
+              ;;
+          esac
+
+          echo "next_version=v$next_version" >> $GITHUB_ENV
+          echo "version=v$next_version" >> $GITHUB_OUTPUT
+
+      - name: Create and push new tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "${GITHUB_ACTOR}"
+          git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git tag "${next_version}"
+          git push origin "${next_version}"
+
+      - name: Run Goreleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

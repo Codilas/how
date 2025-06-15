@@ -1,0 +1,22 @@
+# CODEOWNERS
+# Each line is a file pattern followed by one or more owners.
+# For more details, see: https://help.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners
+
+# Default rule for any file not explicitly matched below:
+* @codilas
+
+# Internal
+/internal/ @codilas
+
+# Packages
+/pkg/ @codilas
+
+# CMD
+/cmd/ @codilas
+
+# Documentation
+/docs/ @codilas/developers
+*.md @codilas
+
+# GitHub workflow files
+/.github/ @codilas

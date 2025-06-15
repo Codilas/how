@@ -1,0 +1,56 @@
+name: Feature Request
+description: Suggest an idea for this project
+labels: ["enhancement", "new"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # Thank you for suggesting a new feature.
+
+        This issue tracker is reserved for feature requests that would improve the project.
+        For general questions or usage support, please visit our documentation or contact support.
+  - type: dropdown
+    attributes:
+      label: Which component would this feature affect?
+      description: Select the component that would be affected by this feature.
+      options:
+        - internal
+        - pkg
+        - cmd
+        - other (please specify)
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem are you trying to solve?
+      placeholder: I'm always frustrated when...
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see.
+      placeholder: A clear and concise description of what you want to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What alternatives have you considered?
+      placeholder: A clear and concise description of any alternative solutions or features you've considered.
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other context or screenshots about the feature request.
+      placeholder: Add any other context about the feature request here.
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        **Note:** Ensure you have provided a **Title** for the issue. If the submit button is disabled after filling out the required fields, double-check your title. 
