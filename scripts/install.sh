@@ -41,8 +41,7 @@ check_platform() {
     
     case "$(uname -m)" in
         x86_64)     ARCH=amd64;;
-        arm64)      ARCH=arm64;;
-        aarch64)    ARCH=arm64;;
+        arm64|aarch64) ARCH=arm64;;
         *)          error "Unsupported architecture: $(uname -m)";;
     esac
     
@@ -61,30 +60,28 @@ get_latest_version() {
 
 # Download and install binary
 install_binary() {
-    BINARY_NAME="how-$PLATFORM-$ARCH"
-    if [ "$PLATFORM" = "windows" ]; then
-        BINARY_NAME="$BINARY_NAME.exe"
-    fi
-    
-    DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$BINARY_NAME"
-    
+    ARCHIVE_NAME="how_${VERSION#v}_${PLATFORM}_${ARCH}.tar.gz"
+    DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ARCHIVE_NAME"
+    TEMP_DIR=$(mktemp -d)
+
     info "Downloading from: $DOWNLOAD_URL"
-    
-    # Create install directory
+
     mkdir -p "$INSTALL_DIR"
-    
-    # Download binary
+
     if command -v curl >/dev/null 2>&1; then
-        curl -L "$DOWNLOAD_URL" -o "$INSTALL_DIR/how"
+        curl -L "$DOWNLOAD_URL" -o "$TEMP_DIR/$ARCHIVE_NAME"
     elif command -v wget >/dev/null 2>&1; then
-        wget "$DOWNLOAD_URL" -O "$INSTALL_DIR/how"
+        wget "$DOWNLOAD_URL" -O "$TEMP_DIR/$ARCHIVE_NAME"
     else
         error "Neither curl nor wget is available"
     fi
-    
-    # Make executable
+
+    tar -xzf "$TEMP_DIR/$ARCHIVE_NAME" -C "$TEMP_DIR"
+    mv "$TEMP_DIR/how" "$INSTALL_DIR/how"
     chmod +x "$INSTALL_DIR/how"
-    
+
+    rm -rf "$TEMP_DIR"
+
     success "Binary installed to $INSTALL_DIR/how"
 }
 
@@ -105,11 +102,11 @@ offer_setup() {
     info "Installation complete!"
     echo
     echo "Next steps:"
-    echo "1. Make sure $INSTALL_DIR is in your PATH"
+    echo "1. Ensure $INSTALL_DIR is in your PATH"
     echo "2. Run 'how setup' to configure your AI provider"
     echo "3. Run 'how install' to set up shell integration"
     echo
-    
+
     read -p "Would you like to run the setup now? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -121,7 +118,7 @@ offer_setup() {
 main() {
     echo "Installing 'how' AI Shell Assistant..."
     echo
-    
+
     check_platform
     get_latest_version
     install_binary
