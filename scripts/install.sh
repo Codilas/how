@@ -3,7 +3,7 @@ set -e
 
 # Installation script for 'how' AI shell assistant
 
-REPO="tzvonimir/how"
+REPO="Codilas/how"
 INSTALL_DIR="$HOME/.local/bin"
 CONFIG_DIR="$HOME/.config/how"
 

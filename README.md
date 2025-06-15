@@ -6,7 +6,7 @@ An intelligent shell assistant that helps you with commands, explanations, and c
 
 ```bash
 # Clone and build
-git clone https://github.com/tzvonimir/how.git
+git clone https://github.com/Codilas/how.git
 cd how
 make install
 
@@ -31,12 +31,12 @@ how write a Python function to validate emails
 
 ### Quick Install
 ```bash
-curl -sSL https://raw.githubusercontent.com/tzvonimir/how/main/scripts/install.sh | sh
+curl -sSL https://raw.githubusercontent.com/Codilas/how/main/scripts/install.sh | sh
 ```
 
 ### From Source
 ```bash
-git clone https://github.com/tzvonimir/how.git
+git clone https://github.com/Codilas/how.git
 cd how
 make install
 ```

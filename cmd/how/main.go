@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/tzvonimir/how/internal/cli"
+	"github.com/Codilas/how/internal/cli"
 )
 
 func main() {

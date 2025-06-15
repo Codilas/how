@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tzvonimir/how/pkg/providers"
+	"github.com/Codilas/how/pkg/providers"
 )
 
 // detectProjectType analyzes the current directory to determine project type

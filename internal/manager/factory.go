@@ -3,7 +3,7 @@ package manager
 import (
 	"fmt"
 
-	"github.com/tzvonimir/how/pkg/providers"
+	"github.com/Codilas/how/pkg/providers"
 )
 
 // ProviderFactory creates providers based on configuration

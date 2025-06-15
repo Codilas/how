@@ -6,7 +6,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/tzvonimir/how/pkg/providers"
+	"github.com/Codilas/how/pkg/providers"
 )
 
 // TemplateData represents the data available for template processing

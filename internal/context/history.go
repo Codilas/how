@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tzvonimir/how/pkg/providers"
+	"github.com/Codilas/how/pkg/providers"
 )
 
 // getRecentCommands reads recent commands from shell history

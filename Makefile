@@ -6,9 +6,9 @@ APP_NAME := how
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
-LDFLAGS := -ldflags "-X github.com/tzvonimir/how/pkg/version.Version=$(VERSION) \
-                    -X github.com/tzvonimir/how/pkg/version.GitCommit=$(GIT_COMMIT) \
-                    -X github.com/tzvonimir/how/pkg/version.BuildDate=$(BUILD_DATE)"
+LDFLAGS := -ldflags "-X github.com/Codilas/how/pkg/version.Version=$(VERSION) \
+                    -X github.com/Codilas/how/pkg/version.GitCommit=$(GIT_COMMIT) \
+                    -X github.com/Codilas/how/pkg/version.BuildDate=$(BUILD_DATE)"
 
 # Build the application
 build:

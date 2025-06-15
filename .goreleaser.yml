@@ -4,6 +4,11 @@ builds:
   - id: how
     main: ./cmd/how/main.go
     binary: how
+    ldflags:
+      - -s -w
+      - -X github.com/Codilas/how/pkg/version.Version={{.Version}}
+      - -X github.com/Codilas/how/pkg/version.GitCommit={{.Commit}}
+      - -X github.com/Codilas/how/pkg/version.BuildDate={{.Date}}
     goos:
       - linux
       - darwin

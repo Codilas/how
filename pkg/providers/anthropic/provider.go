@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/tzvonimir/how/pkg/providers"
+	"github.com/Codilas/how/pkg/providers"
 )
 
 // Provider implements the providers.Provider interface for Anthropic's Claude API

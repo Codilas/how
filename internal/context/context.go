@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/tzvonimir/how/internal/config"
-	"github.com/tzvonimir/how/pkg/providers"
+	"github.com/Codilas/how/internal/config"
+	"github.com/Codilas/how/pkg/providers"
 )
 
 // Gatherer coordinates collecting context information

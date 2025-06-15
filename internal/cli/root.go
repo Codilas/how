@@ -5,17 +5,17 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Codilas/how/internal/config"
+	"github.com/Codilas/how/internal/context"
+	"github.com/Codilas/how/internal/manager"
+	"github.com/Codilas/how/pkg/extractor"
+	"github.com/Codilas/how/pkg/providers"
+	"github.com/Codilas/how/pkg/providers/anthropic"
+	"github.com/Codilas/how/pkg/text"
+	"github.com/Codilas/how/pkg/version"
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/tzvonimir/how/internal/config"
-	"github.com/tzvonimir/how/internal/context"
-	"github.com/tzvonimir/how/internal/manager"
-	"github.com/tzvonimir/how/pkg/extractor"
-	"github.com/tzvonimir/how/pkg/providers"
-	"github.com/tzvonimir/how/pkg/providers/anthropic"
-	"github.com/tzvonimir/how/pkg/text"
-	"github.com/tzvonimir/how/pkg/version"
 )
 
 var (

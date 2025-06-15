@@ -1,4 +1,4 @@
-module github.com/tzvonimir/how
+module github.com/Codilas/how
 
 go 1.22.4
 
