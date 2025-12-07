@@ -326,3 +326,65 @@ func TestRunClearHistoryDeletionError(t *testing.T) {
 		t.Fatalf("expected no success message when deletion fails, got: %q", stdout.String())
 	}
 }
+
+// TestGetHistoryFileReturnsCorrectPath tests that getHistoryFile returns the expected path structure.
+func TestGetHistoryFileReturnsCorrectPath(t *testing.T) {
+	path := getHistoryFile()
+
+	// Verify the path ends with the expected filename and directory structure
+	expectedSuffix := filepath.Join(".config", "how", "history.txt")
+	if !strings.HasSuffix(path, expectedSuffix) {
+		t.Errorf("expected path to end with %q, got: %q", expectedSuffix, path)
+	}
+}
+
+// TestGetHistoryFileContainsUserHomeDir tests that getHistoryFile includes the user home directory.
+func TestGetHistoryFileContainsUserHomeDir(t *testing.T) {
+	path := getHistoryFile()
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("failed to get user home directory: %v", err)
+	}
+
+	if !strings.HasPrefix(path, homeDir) {
+		t.Errorf("expected path to start with home directory %q, got: %q", homeDir, path)
+	}
+}
+
+// TestGetHistoryFilePathIsAbsolute tests that getHistoryFile returns an absolute path.
+func TestGetHistoryFilePathIsAbsolute(t *testing.T) {
+	path := getHistoryFile()
+
+	if !filepath.IsAbs(path) {
+		t.Errorf("expected absolute path, got relative path: %q", path)
+	}
+}
+
+// TestGetHistoryFilePathStructure tests that getHistoryFile returns a properly structured path.
+func TestGetHistoryFilePathStructure(t *testing.T) {
+	path := getHistoryFile()
+
+	// Verify the path components are correct
+	dir := filepath.Dir(path)
+	filename := filepath.Base(path)
+
+	if filename != "history.txt" {
+		t.Errorf("expected filename to be %q, got: %q", "history.txt", filename)
+	}
+
+	// Verify .config/how directory structure is present
+	if !strings.Contains(dir, ".config") || !strings.Contains(dir, "how") {
+		t.Errorf("expected path to contain .config/how directories, got: %q", path)
+	}
+}
+
+// TestGetHistoryFileConsistency tests that getHistoryFile returns the same path on multiple calls.
+func TestGetHistoryFileConsistency(t *testing.T) {
+	path1 := getHistoryFile()
+	path2 := getHistoryFile()
+
+	if path1 != path2 {
+		t.Errorf("expected consistent paths, got: %q and %q", path1, path2)
+	}
+}
