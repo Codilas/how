@@ -1,5 +1,5 @@
 # Makefile
-.PHONY: build install test clean dev deps fmt lint
+.PHONY: build install test test-race test-coverage test-coverage-html clean dev deps fmt lint setup-dev
 
 # Build variables
 APP_NAME := how
@@ -41,6 +41,18 @@ test:
 # Run tests with race detection
 test-race:
 	go test -v -race ./...
+
+# Run tests with coverage
+test-coverage:
+	go test -v -coverprofile=coverage.out -covermode=atomic ./...
+	@echo ""
+	@echo "Coverage Summary:"
+	@go tool cover -func=coverage.out | tail -1
+
+# Generate HTML coverage report
+test-coverage-html: test-coverage
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "HTML coverage report generated: coverage.html"
 
 # Download dependencies
 deps:
