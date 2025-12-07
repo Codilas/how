@@ -1,111 +1,144 @@
 project:
   name: how
   type: CLI Application
-  description: AI-powered shell assistant that provides command suggestions, code
-    generation, and explanations from the terminal
   language: Go
-  repository: https://github.com/Codilas/how
+  description: An intelligent shell assistant providing AI-powered command suggestions,
+    code generation, and explanations using Claude and other LLMs
 codebase_map:
   apps:
   - name: how
-    path: cmd/how
-    description: Main CLI entry point
+    path: cmd/how/main.go
+    purpose: CLI entry point that bootstraps the root command handler
   packages:
   - name: cli
-    path: internal/cli
-    description: Cobra-based command interface, subcommands, and REPL loop
+    path: internal/cli/
+    purpose: Command-line interface with root command, setup wizard, subcommands for
+      providers/history/install
+    key_files:
+    - root.go (318 lines) main command handler with prompt processing
+    - setup.go (145 lines) interactive configuration wizard
+    - providers.go (132 lines) provider management subcommand
+    - history.go (68 lines) conversation history management
+    - install.go (82 lines) shell integration setup
   - name: config
-    path: internal/config
-    description: Configuration loading and management from YAML files
+    path: internal/config/
+    purpose: Configuration management using viper for YAML persistence and multi-source
+      config loading
+    key_files:
+    - config.go (129 lines) config structures, loading, and validation
   - name: context
-    path: internal/context
-    description: Context gathering - git info, shell history, project metadata
+    path: internal/context/
+    purpose: Context gathering for enriching prompts with environment information
+      (git, files, history, project detection)
+    key_files:
+    - context.go (263 lines) main context orchestrator
+    - git.go (179 lines) git repository information
+    - project.go (247 lines) project type detection (Node, Python, Go, Rust, Docker)
+    - history.go (186 lines) shell history parsing for bash, zsh, fish
   - name: manager
-    path: internal/manager
-    description: Provider factory and registration system for AI backends
+    path: internal/manager/
+    purpose: Provider lifecycle management with factory pattern for creating and selecting
+      AI providers
+    key_files:
+    - manager.go (198 lines) provider manager and intelligent provider selection
+    - factory.go (77 lines) provider factory with registration and instantiation
   - name: providers
-    path: pkg/providers
-    description: Pluggable interface for AI providers, utilities, and type definitions
-  - name: anthropic
-    path: pkg/providers/anthropic
-    description: Anthropic Claude API implementation with streaming support
+    path: pkg/providers/
+    purpose: Provider abstraction layer defining interfaces and data types for all
+      AI providers
+    key_files:
+    - interface.go (23 lines) core Provider interface
+    - types.go (152 lines) Context, Response, Capabilities, and metadata types
+    - errors.go (16 lines) provider-specific error definitions
+    - utils.go (129 lines) command safety analysis and categorization
+    - anthropic/provider.go (297 lines) Claude API implementation
+    - anthropic/templates.go system prompt templates
   - name: extractor
-    path: pkg/extractor
-    description: Command extraction from AI responses and text parsing
+    path: pkg/extractor/
+    purpose: Extract executable commands and workflows from LLM responses
+    key_files:
+    - command.go (163 lines) structured and markdown code block extraction
   - name: text
-    path: pkg/text
-    description: Terminal formatting and output rendering
+    path: pkg/text/
+    purpose: Terminal output formatting with markdown rendering, syntax highlighting,
+      colors
+    key_files:
+    - formatter.go (17576 bytes) regex-based markdown parser with ANSI color support
   - name: version
-    path: pkg/version
-    description: Build version and metadata injection
+    path: pkg/version/
+    purpose: Version information management set via build flags
+    key_files:
+    - version.go (19 lines) version, commit, and build date variables
 tech_stack:
   language: Go 1.22.4
-  core_libraries:
-  - 'github.com/spf13/cobra: CLI framework'
-  - 'github.com/spf13/viper: Configuration management'
-  - 'github.com/AlecAivazis/survey: Interactive prompts'
-  - 'github.com/fatih/color: Terminal colors'
-  - 'github.com/briandowns/spinner: Loading spinners'
-  databases: null
-  external_services:
-  - Anthropic Claude API
-  build_tools:
-  - Make
-  - GoReleaser
+  cli_framework: Cobra v1.9.1
+  config_management: Viper v1.20.1
+  interactive_prompts: Survey v2
+  terminal_features:
+  - Spinner (briandowns/spinner)
+  - Colors (fatih/color)
+  serialization: YAML v3
 purpose:
   goals:
-  - Provide AI-powered shell assistance directly from terminal
-  - Support multiple AI providers with pluggable architecture
-  - Gather context from shell environment for smarter responses
-  - Suggest safe and unsafe commands with descriptions
+  - Provide intelligent context-aware shell assistance using Claude API
+  - Generate commands and code based on natural language prompts
+  - Explain commands and concepts in terminal
+  - Support multi-provider architecture for flexibility
   key_features:
-  - Context-aware prompts (git info, directory, shell history)
-  - Multi-provider support (Claude, extensible to others)
-  - Command extraction and safety warnings
-  - Streaming and buffered response modes
-  - Shell history integration
-  - Setup wizard for provider configuration
+  - Context gathering from git, files, shell history, environment
+  - Multi-provider support with factory pattern
+  - Interactive setup wizard for configuration
+  - Stream and non-stream response modes
+  - Rich terminal output with syntax highlighting
+  - Command extraction and safety analysis
+  - Conversation history persistence
+  - Shell integration setup
   architecture_patterns:
-  - Provider pattern for extensible AI backends
-  - Cobra CLI command structure with subcommands
-  - Viper configuration management
-  - Factory pattern for provider creation
-  - Streaming channel-based responses
+  - Factory Pattern for provider instantiation
+  - Strategy Pattern for context gathering strategies
+  - Command Pattern via Cobra for CLI structure
+  - Dependency Injection for config and providers
+  - Interface-based design for extensibility
 development:
   setup_commands:
-  - 'make setup-dev: Install dev dependencies and golangci-lint'
-  - 'go mod download: Download module dependencies'
-  dev_server: null
-  build_command: make build
-  run_command: make dev && ./bin/how <prompt>
+  - git clone https://github.com/Codilas/how.git
+  - cd how
+  - make deps
+  - make setup-dev
   essential_commands:
-  - 'make build: Compile binary to bin/how'
-  - 'make test: Run all tests'
-  - 'make fmt: Format code with gofmt'
-  - 'make deps: Tidy and download dependencies'
+    build: make build
+    dev: make dev
+    format: make fmt
+    lint: make lint
+    install: make install
+    release: make release
+  config_initialization: how setup
+  config_location: ~/.config/how/config.yaml
+  environment_variables:
+    HOW_CURRENTPROVIDER: override current provider
+    HOW_PROVIDERS_*: override provider config
+    HOW_CONTEXT_*: override context settings
+    HOW_DISPLAY_*: override display settings
 verification:
-  test_command: make test
-  test_verbose: make test-race
-  type_check: null
-  lint: make lint
+  test: make test
+  test_race: make test-race
   build: make build
+  lint: make lint
+  typecheck: go vet ./...
 conventions:
-  package_structure:
-  - 'cmd/*: Application entry points'
-  - 'internal/*: Private packages not exported'
-  - 'pkg/*: Public reusable packages'
-  naming:
-  - PascalCase for exported types and functions
-  - camelCase for unexported identifiers
-  - Provider implementations in their own subdirectories
+  file_organization:
+  - cmd/ contains entry points
+  - internal/ contains private packages (cli, config, context, manager)
+  - pkg/ contains public/reusable packages (providers, extractor, text, version)
+  - scripts/ contains installation and build helper scripts
   code_patterns:
-  - Interfaces in providers/interface.go for extensibility
-  - Config structs with embedded types
-  - Error handling with early returns
-  - Context passed as function parameter for cancellation
-  key_files:
-  - 'internal/cli/root.go: Main command handler and provider orchestration'
-  - 'pkg/providers/interface.go: Provider interface definition'
-  - 'pkg/providers/anthropic/provider.go: Claude implementation'
-  - 'internal/config/config.go: Configuration structures'
-  - 'Makefile: Build and development targets'
+  - Provider interface implemented by all AI providers
+  - Config structures with viper tags for YAML binding
+  - Factory pattern for provider creation and registration
+  - Modular context gathering with independent failure handling
+  - Cobra commands for all CLI functionality
+  naming:
+  - Internal implementation in internal/ package
+  - Public interfaces in pkg/ with implementation details
+  - Config structures follow pattern ConfigName in config.go
+  - Provider types named as ProviderType in respective packages
