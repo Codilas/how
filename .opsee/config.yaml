@@ -1,0 +1,111 @@
+project:
+  name: How
+  type: CLI Tool
+  description: AI Shell Assistant - intelligent terminal companion for commands, explanations,
+    and code generation
+  language: Go
+  version: 1.0.0
+codebase_map:
+  structure:
+    cmd/:
+      purpose: Command-line interface entry points and command handlers
+    internal/:
+      purpose: Private application logic, unexported packages
+    pkg/:
+      purpose: Public reusable packages for external consumers
+    scripts/:
+      purpose: Build, installation, and utility scripts
+  key_packages:
+  - name: CLI Commands
+    location: cmd/
+    purpose: Cobra-based command handlers for setup, query, config
+  - name: AI Integration
+    location: internal/
+    purpose: Provider abstraction for Claude, GPT-4, local models
+  - name: Context Engine
+    location: internal/
+    purpose: Shell context collection, directory awareness, command history
+  - name: Config Management
+    location: internal/
+    purpose: Viper-based configuration, provider credentials, user preferences
+tech_stack:
+  language: Go 1.22.4
+  cli_framework: Cobra 1.9.1
+  config_management: Viper 1.20.1
+  ui_components:
+  - AlecAivazis/survey (interactive prompts)
+  - briandowns/spinner (loading indicators)
+  - fatih/color (terminal colors)
+  serialization: yaml.v3
+  build_system: Makefile
+purpose:
+  goals:
+  - Provide context-aware AI assistance from terminal
+  - Support multiple AI providers (Claude, GPT-4, local)
+  - Enable command suggestions and explanations
+  - Generate code from natural language prompts
+  key_features:
+  - Multi-provider AI support with provider abstraction
+  - Shell context capture (directory, environment, history)
+  - Conversation memory for related queries
+  - Syntax-highlighted rich output formatting
+  - Interactive setup wizard for configuration
+  architecture_patterns:
+  - Provider pattern for AI integration
+  - Configuration-driven multi-backend support
+  - Context collector pattern for environment awareness
+  - Command pattern via Cobra framework
+development:
+  setup: make setup-dev
+  build: make build
+  test: make test
+  dev_run: ./bin/how "test prompt"
+  install_local: make install
+  key_commands:
+    setup: how setup
+    query: how "your question here"
+    explain: how explain kubernetes
+    generate: how write a bash script to backup MySQL
+verification:
+  test: make test
+  build: make build
+  lint: golangci-lint run ./...
+conventions:
+  naming:
+    packages: lowercase, single-word where possible
+    functions: camelCase, exported functions capitalized
+    files: snake_case.go for internal, descriptive names
+  code_patterns:
+    config: Use Viper for all configuration management
+    cli: Use Cobra for command definitions
+    errors: Return errors explicitly, no panics in production code
+    logging: Use structured logging for debugging
+    context: Always capture and pass user shell context
+structure_notes:
+  entry_point: cmd/root.go or cmd/main.go
+  config_location: ~/.config/how/ or XDG_CONFIG_HOME
+  provider_abstraction: Supports pluggable AI backends
+  state_management: Config stored in YAML via Viper
+detailed_guides:
+- path: .opsee/guides/ai-provider-integration.md
+  when: Adding new AI provider or modifying existing provider integration
+- path: .opsee/guides/context-collection.md
+  when: Enhancing shell context capture or environment awareness
+- path: .opsee/guides/cli-commands.md
+  when: Adding new commands or modifying command structure
+- path: .opsee/guides/build-deployment.md
+  when: Building releases or modifying build process
+git:
+  main_branch: main
+  workflow: Feature branches merged to main via PR
+  recent_commits:
+  - 6583cec Fix scripts directory
+  - 9f6ea13 Update github path
+  - 4cd77bd Initial commit
+quality_gates:
+  required_checks:
+  - build succeeds
+  - tests pass
+  optional_checks:
+  - golangci-lint clean
+  - documentation updated
