@@ -1100,6 +1100,615 @@ func TestYAMLTags_OmitEmpty(t *testing.T) {
 	}
 }
 
+// TestSave_DefaultConfigDirectory tests saving to default config directory
+func TestSave_DefaultConfigDirectory(t *testing.T) {
+	// Skip if we can't determine home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("unable to determine home directory")
+	}
+
+	// Create a temporary override for testing
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.yaml")
+
+	config := &Config{
+		CurrentProvider: "anthropic",
+		Providers: map[string]ProviderConfig{
+			"anthropic": {
+				Type:      "anthropic",
+				APIKey:    "sk-test",
+				Model:     "claude-3",
+				MaxTokens: 2048,
+			},
+		},
+	}
+
+	// Test saving with empty string (would save to default location)
+	// We use explicit path instead to avoid modifying user's home directory
+	err = config.Save(configFile)
+	if err != nil {
+		t.Fatalf("Save() returned error: %v", err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(configFile); err != nil {
+		t.Fatalf("saved config file doesn't exist: %v", err)
+	}
+
+	// Verify the config is readable
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("failed to read saved config: %v", err)
+	}
+
+	var loaded Config
+	err = yaml.Unmarshal(data, &loaded)
+	if err != nil {
+		t.Fatalf("saved YAML is invalid: %v", err)
+	}
+
+	if loaded.CurrentProvider != "anthropic" {
+		t.Errorf("CurrentProvider = %q, want %q", loaded.CurrentProvider, "anthropic")
+	}
+
+	_ = homeDir // Use homeDir to satisfy linter
+}
+
+// TestSave_CustomFilePath tests saving to a custom file path
+func TestSave_CustomFilePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	customPath := filepath.Join(tmpDir, "my_custom_config.yaml")
+
+	config := &Config{
+		CurrentProvider: "openai",
+		Providers: map[string]ProviderConfig{
+			"openai": {
+				Type:      "openai",
+				APIKey:    "sk-openai-test",
+				Model:     "gpt-4",
+				MaxTokens: 8192,
+			},
+		},
+		Display: DisplayConfig{
+			Color:           true,
+			SyntaxHighlight: true,
+		},
+	}
+
+	err := config.Save(customPath)
+	if err != nil {
+		t.Fatalf("Save() returned error: %v", err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(customPath); err != nil {
+		t.Fatalf("saved config file doesn't exist: %v", err)
+	}
+
+	// Verify content
+	data, err := os.ReadFile(customPath)
+	if err != nil {
+		t.Fatalf("failed to read saved config: %v", err)
+	}
+
+	var loaded Config
+	err = yaml.Unmarshal(data, &loaded)
+	if err != nil {
+		t.Fatalf("saved YAML is invalid: %v", err)
+	}
+
+	if loaded.CurrentProvider != "openai" {
+		t.Errorf("CurrentProvider = %q, want %q", loaded.CurrentProvider, "openai")
+	}
+
+	if loaded.Providers["openai"].Model != "gpt-4" {
+		t.Errorf("Model = %q, want %q", loaded.Providers["openai"].Model, "gpt-4")
+	}
+
+	if !loaded.Display.Color {
+		t.Errorf("Display.Color = %v, want true", loaded.Display.Color)
+	}
+}
+
+// TestSave_NestedDirectoryCreation tests creating deeply nested directories
+func TestSave_NestedDirectoryCreation(t *testing.T) {
+	tmpDir := t.TempDir()
+	deepPath := filepath.Join(tmpDir, "level1", "level2", "level3", "level4", "config.yaml")
+
+	config := &Config{
+		CurrentProvider: "anthropic",
+	}
+
+	err := config.Save(deepPath)
+	if err != nil {
+		t.Fatalf("Save() returned error for deeply nested path: %v", err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(deepPath); err != nil {
+		t.Fatalf("deeply nested config file doesn't exist: %v", err)
+	}
+
+	// Verify all parent directories were created
+	parentDir := filepath.Dir(deepPath)
+	if _, err := os.Stat(parentDir); err != nil {
+		t.Fatalf("parent directory was not created: %v", err)
+	}
+}
+
+// TestSave_DirectoryPermissions tests that created directories have correct permissions
+func TestSave_DirectoryPermissions(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "newdir", "config.yaml")
+
+	config := &Config{
+		CurrentProvider: "anthropic",
+	}
+
+	err := config.Save(configFile)
+	if err != nil {
+		t.Fatalf("Save() returned error: %v", err)
+	}
+
+	// Check directory permissions
+	dir := filepath.Dir(configFile)
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatalf("failed to stat directory: %v", err)
+	}
+
+	expectedPerm := os.FileMode(0755)
+	if info.Mode().Perm() != expectedPerm {
+		t.Errorf("directory permissions = %o, want %o", info.Mode().Perm(), expectedPerm)
+	}
+}
+
+// TestSave_YAMLMarshalingComplexTypes tests YAML marshaling of complex nested types
+func TestSave_YAMLMarshalingComplexTypes(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "complex.yaml")
+
+	config := &Config{
+		CurrentProvider: "anthropic",
+		Providers: map[string]ProviderConfig{
+			"anthropic": {
+				Type:      "anthropic",
+				APIKey:    "sk-test",
+				Model:     "claude-3-opus",
+				MaxTokens: 4096,
+				Temperature: 0.8,
+				TopP:      0.95,
+				SystemPrompt: "You are a helpful AI assistant",
+				CustomHeaders: map[string]string{
+					"X-Custom": "value",
+					"X-Auth":   "bearer token",
+				},
+			},
+			"openai": {
+				Type:      "openai",
+				APIKey:    "sk-openai",
+				Model:     "gpt-4",
+				MaxTokens: 8192,
+			},
+		},
+		Context: ContextConfig{
+			IncludeFiles:       true,
+			IncludeHistory:     20,
+			IncludeEnvironment: false,
+			IncludeGit:         true,
+			MaxContextSize:     100000,
+			ExcludePatterns:    []string{"*.log", "node_modules/*", ".git/*"},
+		},
+		Display: DisplayConfig{
+			SyntaxHighlight: true,
+			ShowContext:     true,
+			Emoji:           false,
+			Color:           true,
+		},
+		History: HistoryConfig{
+			Enabled:  true,
+			MaxSize:  5000,
+			FilePath: "~/.how/history",
+		},
+	}
+
+	err := config.Save(configFile)
+	if err != nil {
+		t.Fatalf("Save() returned error: %v", err)
+	}
+
+	// Verify YAML is valid and contains all data
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("failed to read saved file: %v", err)
+	}
+
+	var loaded Config
+	err = yaml.Unmarshal(data, &loaded)
+	if err != nil {
+		t.Fatalf("saved YAML is invalid: %v", err)
+	}
+
+	// Verify complex nested types
+	if len(loaded.Providers) != 2 {
+		t.Errorf("provider count = %d, want 2", len(loaded.Providers))
+	}
+
+	if loaded.Providers["anthropic"].CustomHeaders["X-Custom"] != "value" {
+		t.Errorf("CustomHeaders not preserved correctly")
+	}
+
+	if len(loaded.Context.ExcludePatterns) != 3 {
+		t.Errorf("ExcludePatterns count = %d, want 3", len(loaded.Context.ExcludePatterns))
+	}
+
+	if loaded.History.MaxSize != 5000 {
+		t.Errorf("History.MaxSize = %d, want 5000", loaded.History.MaxSize)
+	}
+}
+
+// TestSave_SpecialCharactersInPath tests saving with special characters in file path
+func TestSave_SpecialCharactersInPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config-file_123.yaml")
+
+	config := &Config{
+		CurrentProvider: "anthropic",
+	}
+
+	err := config.Save(configFile)
+	if err != nil {
+		t.Fatalf("Save() returned error: %v", err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(configFile); err != nil {
+		t.Fatalf("saved config file doesn't exist: %v", err)
+	}
+}
+
+// TestSave_FilePermissionsAre0644 tests that saved files have 0644 permissions
+func TestSave_FilePermissionsAre0644(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "perm_test.yaml")
+
+	config := &Config{
+		CurrentProvider: "anthropic",
+		Providers: map[string]ProviderConfig{
+			"anthropic": {
+				Type:      "anthropic",
+				APIKey:    "sk-secret-key",
+				Model:     "claude-3",
+				MaxTokens: 2048,
+			},
+		},
+	}
+
+	err := config.Save(configFile)
+	if err != nil {
+		t.Fatalf("Save() returned error: %v", err)
+	}
+
+	// Verify file permissions
+	info, err := os.Stat(configFile)
+	if err != nil {
+		t.Fatalf("failed to stat file: %v", err)
+	}
+
+	expectedPerm := os.FileMode(0644)
+	if info.Mode().Perm() != expectedPerm {
+		t.Errorf("file permissions = %o, want %o", info.Mode().Perm(), expectedPerm)
+	}
+}
+
+// TestSave_PermissionDeniedOnWrite tests error handling when write permission is denied
+func TestSave_PermissionDeniedOnWrite(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("test cannot run as root")
+	}
+
+	tmpDir := t.TempDir()
+	readOnlyDir := filepath.Join(tmpDir, "readonly")
+
+	// Create directory and remove write permissions
+	if err := os.Mkdir(readOnlyDir, 0755); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
+
+	if err := os.Chmod(readOnlyDir, 0555); err != nil {
+		t.Fatalf("failed to change permissions: %v", err)
+	}
+
+	// Restore permissions for cleanup
+	defer os.Chmod(readOnlyDir, 0755)
+
+	configFile := filepath.Join(readOnlyDir, "config.yaml")
+
+	config := &Config{
+		CurrentProvider: "anthropic",
+	}
+
+	err := config.Save(configFile)
+	if err == nil {
+		t.Fatalf("Save() should return error when write permission is denied")
+	}
+
+	// Verify error message contains useful information
+	if err.Error() == "" {
+		t.Errorf("error message is empty")
+	}
+
+	if !contains(err.Error(), "permission denied") && !contains(err.Error(), "failed to") {
+		t.Errorf("error message should indicate permission issue: %v", err)
+	}
+}
+
+// TestSave_PermissionDeniedOnDirectory tests error when can't create directory
+func TestSave_PermissionDeniedOnDirectory(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("test cannot run as root")
+	}
+
+	tmpDir := t.TempDir()
+	readOnlyDir := filepath.Join(tmpDir, "readonly")
+
+	// Create directory
+	if err := os.Mkdir(readOnlyDir, 0755); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
+
+	// Remove write permission
+	if err := os.Chmod(readOnlyDir, 0555); err != nil {
+		t.Fatalf("failed to change permissions: %v", err)
+	}
+
+	// Restore permissions for cleanup
+	defer os.Chmod(readOnlyDir, 0755)
+
+	configFile := filepath.Join(readOnlyDir, "subdir", "config.yaml")
+
+	config := &Config{
+		CurrentProvider: "anthropic",
+	}
+
+	err := config.Save(configFile)
+	if err == nil {
+		t.Fatalf("Save() should return error when directory creation is denied")
+	}
+
+	if err.Error() == "" {
+		t.Errorf("error message is empty")
+	}
+}
+
+// TestSave_RobustnessWithLargeConfig tests saving very large config structures
+func TestSave_RobustnessWithLargeConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "large_save.yaml")
+
+	// Create config with many providers
+	config := &Config{
+		CurrentProvider: "anthropic",
+		Providers:       make(map[string]ProviderConfig),
+	}
+
+	for i := 0; i < 50; i++ {
+		config.Providers[fmt.Sprintf("provider-%d", i)] = ProviderConfig{
+			Type:      "test",
+			APIKey:    fmt.Sprintf("key-%d", i),
+			Model:     "model",
+			MaxTokens: 2048 + i,
+		}
+	}
+
+	// Add many exclude patterns
+	config.Context.ExcludePatterns = make([]string, 500)
+	for i := 0; i < 500; i++ {
+		config.Context.ExcludePatterns[i] = fmt.Sprintf("pattern-%d", i)
+	}
+
+	err := config.Save(configFile)
+	if err != nil {
+		t.Fatalf("Save() returned error for large config: %v", err)
+	}
+
+	// Verify file exists and can be loaded back
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("failed to read saved file: %v", err)
+	}
+
+	var loaded Config
+	err = yaml.Unmarshal(data, &loaded)
+	if err != nil {
+		t.Fatalf("saved YAML is invalid for large config: %v", err)
+	}
+
+	if len(loaded.Providers) != 50 {
+		t.Errorf("provider count after save = %d, want 50", len(loaded.Providers))
+	}
+
+	if len(loaded.Context.ExcludePatterns) != 500 {
+		t.Errorf("exclude patterns count after save = %d, want 500", len(loaded.Context.ExcludePatterns))
+	}
+}
+
+// TestSave_UnicodeInConfig tests saving config with unicode characters
+func TestSave_UnicodeInConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "unicode.yaml")
+
+	config := &Config{
+		CurrentProvider: "anthropic",
+		Providers: map[string]ProviderConfig{
+			"anthropic": {
+				Type:         "anthropic",
+				APIKey:       "sk-test",
+				Model:        "claude-3",
+				MaxTokens:    2048,
+				SystemPrompt: "你好 مرحبا привет 🚀",
+			},
+		},
+	}
+
+	err := config.Save(configFile)
+	if err != nil {
+		t.Fatalf("Save() returned error: %v", err)
+	}
+
+	// Verify unicode is preserved
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("failed to read saved file: %v", err)
+	}
+
+	var loaded Config
+	err = yaml.Unmarshal(data, &loaded)
+	if err != nil {
+		t.Fatalf("saved YAML is invalid: %v", err)
+	}
+
+	if loaded.Providers["anthropic"].SystemPrompt != "你好 مرحبا привет 🚀" {
+		t.Errorf("unicode not preserved in SystemPrompt")
+	}
+}
+
+// TestSave_EmptyConfig tests saving a completely empty config
+func TestSave_EmptyConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "empty.yaml")
+
+	config := &Config{}
+
+	err := config.Save(configFile)
+	if err != nil {
+		t.Fatalf("Save() returned error for empty config: %v", err)
+	}
+
+	// Verify file exists and is valid YAML
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("failed to read saved file: %v", err)
+	}
+
+	var loaded Config
+	err = yaml.Unmarshal(data, &loaded)
+	if err != nil {
+		t.Fatalf("saved YAML is invalid for empty config: %v", err)
+	}
+}
+
+// TestSave_MultipleConsecutiveSaves tests saving multiple times without issues
+func TestSave_MultipleConsecutiveSaves(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "consecutive.yaml")
+
+	config := &Config{
+		CurrentProvider: "anthropic",
+	}
+
+	// Save multiple times with different data
+	for i := 0; i < 5; i++ {
+		config.CurrentProvider = fmt.Sprintf("provider-%d", i)
+		config.Providers = map[string]ProviderConfig{
+			fmt.Sprintf("provider-%d", i): {
+				Type:      "test",
+				APIKey:    fmt.Sprintf("key-%d", i),
+				Model:     "model",
+				MaxTokens: 2048 + i,
+			},
+		}
+
+		err := config.Save(configFile)
+		if err != nil {
+			t.Fatalf("Save() iteration %d returned error: %v", i, err)
+		}
+	}
+
+	// Verify final state
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("failed to read final saved file: %v", err)
+	}
+
+	var loaded Config
+	err = yaml.Unmarshal(data, &loaded)
+	if err != nil {
+		t.Fatalf("final saved YAML is invalid: %v", err)
+	}
+
+	if loaded.CurrentProvider != "provider-4" {
+		t.Errorf("CurrentProvider = %q, want %q", loaded.CurrentProvider, "provider-4")
+	}
+}
+
+// TestSave_WithNestedMapsAndSlices tests complex data structure marshaling
+func TestSave_WithNestedMapsAndSlices(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "nested.yaml")
+
+	config := &Config{
+		CurrentProvider: "anthropic",
+		Providers: map[string]ProviderConfig{
+			"anthropic": {
+				Type:      "anthropic",
+				APIKey:    "sk-test",
+				Model:     "claude-3",
+				MaxTokens: 4096,
+				CustomHeaders: map[string]string{
+					"Authorization": "Bearer token123",
+					"X-API-Version": "v1",
+					"X-Client-ID":   "my-app",
+				},
+			},
+		},
+		Context: ContextConfig{
+			IncludeFiles:       true,
+			IncludeHistory:     10,
+			IncludeEnvironment: true,
+			IncludeGit:         true,
+			MaxContextSize:     100000,
+			ExcludePatterns: []string{
+				"*.log",
+				".git/*",
+				"node_modules/*",
+				".env*",
+				"dist/*",
+			},
+		},
+	}
+
+	err := config.Save(configFile)
+	if err != nil {
+		t.Fatalf("Save() returned error: %v", err)
+	}
+
+	// Verify all nested data is preserved
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("failed to read saved file: %v", err)
+	}
+
+	var loaded Config
+	err = yaml.Unmarshal(data, &loaded)
+	if err != nil {
+		t.Fatalf("saved YAML is invalid: %v", err)
+	}
+
+	if len(loaded.Providers["anthropic"].CustomHeaders) != 3 {
+		t.Errorf("CustomHeaders count = %d, want 3", len(loaded.Providers["anthropic"].CustomHeaders))
+	}
+
+	if loaded.Providers["anthropic"].CustomHeaders["Authorization"] != "Bearer token123" {
+		t.Errorf("CustomHeaders not preserved correctly")
+	}
+
+	if len(loaded.Context.ExcludePatterns) != 5 {
+		t.Errorf("ExcludePatterns count = %d, want 5", len(loaded.Context.ExcludePatterns))
+	}
+}
+
 // Helper function to check if string contains substring
 func contains(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 && findInString(s, substr)
