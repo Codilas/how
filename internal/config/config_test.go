@@ -1205,3 +1205,142 @@ func TestSaveMultipleConfigsToSameDirectory(t *testing.T) {
 		t.Errorf("config2 provider mismatch: expected provider2, got %s", loaded2.CurrentProvider)
 	}
 }
+
+// TestGetConfigDirSuccessfulResolution tests that getConfigDir successfully resolves the home directory.
+func TestGetConfigDirSuccessfulResolution(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	// Set up a temporary home directory
+	homeDir := helper.TempDir()
+	oldHome := os.Getenv("HOME")
+	if err := os.Setenv("HOME", homeDir); err != nil {
+		t.Fatalf("failed to set HOME: %v", err)
+	}
+	defer func() {
+		if oldHome != "" {
+			os.Setenv("HOME", oldHome)
+		} else {
+			os.Unsetenv("HOME")
+		}
+	}()
+
+	configDir, err := getConfigDir()
+	if err != nil {
+		t.Fatalf("getConfigDir failed: %v", err)
+	}
+
+	expectedDir := filepath.Join(homeDir, ".config", "how")
+	if configDir != expectedDir {
+		t.Errorf("config directory mismatch: expected %s, got %s", expectedDir, configDir)
+	}
+}
+
+// TestGetConfigDirReturnsCorrectPath tests that getConfigDir returns the correct path format.
+func TestGetConfigDirReturnsCorrectPath(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	homeDir := helper.TempDir()
+	oldHome := os.Getenv("HOME")
+	if err := os.Setenv("HOME", homeDir); err != nil {
+		t.Fatalf("failed to set HOME: %v", err)
+	}
+	defer func() {
+		if oldHome != "" {
+			os.Setenv("HOME", oldHome)
+		} else {
+			os.Unsetenv("HOME")
+		}
+	}()
+
+	configDir, err := getConfigDir()
+	if err != nil {
+		t.Fatalf("getConfigDir failed: %v", err)
+	}
+
+	// Verify the path contains the expected components
+	if !filepath.IsAbs(configDir) {
+		t.Errorf("expected absolute path, got relative path: %s", configDir)
+	}
+
+	// Verify path ends with the correct directory structure
+	if !filepath.HasPrefix(configDir, homeDir) {
+		t.Errorf("config directory should be under home directory: expected to start with %s, got %s", homeDir, configDir)
+	}
+
+	if !filepath.HasPrefix(configDir, filepath.Join(homeDir, ".config")) {
+		t.Errorf("config directory should be under .config: expected to contain %s, got %s", filepath.Join(homeDir, ".config"), configDir)
+	}
+}
+
+// TestGetConfigDirErrorHandlingNoHomeDir tests that getConfigDir returns an error when home directory cannot be determined.
+func TestGetConfigDirErrorHandlingNoHomeDir(t *testing.T) {
+	// Save current HOME value
+	oldHome, wasSet := os.LookupEnv("HOME")
+	defer func() {
+		if wasSet {
+			os.Setenv("HOME", oldHome)
+		} else {
+			os.Unsetenv("HOME")
+		}
+	}()
+
+	// Clear HOME to simulate missing home directory
+	if err := os.Unsetenv("HOME"); err != nil {
+		t.Fatalf("failed to unset HOME: %v", err)
+	}
+
+	configDir, err := getConfigDir()
+	if err == nil {
+		t.Error("expected error when home directory cannot be determined, got nil")
+	}
+
+	if configDir != "" {
+		t.Errorf("expected empty config directory on error, got %s", configDir)
+	}
+}
+
+// TestGetConfigDirConsistency tests that getConfigDir returns consistent results across multiple calls.
+func TestGetConfigDirConsistency(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	homeDir := helper.TempDir()
+	oldHome := os.Getenv("HOME")
+	if err := os.Setenv("HOME", homeDir); err != nil {
+		t.Fatalf("failed to set HOME: %v", err)
+	}
+	defer func() {
+		if oldHome != "" {
+			os.Setenv("HOME", oldHome)
+		} else {
+			os.Unsetenv("HOME")
+		}
+	}()
+
+	// Call getConfigDir multiple times
+	configDir1, err1 := getConfigDir()
+	if err1 != nil {
+		t.Fatalf("first getConfigDir call failed: %v", err1)
+	}
+
+	configDir2, err2 := getConfigDir()
+	if err2 != nil {
+		t.Fatalf("second getConfigDir call failed: %v", err2)
+	}
+
+	configDir3, err3 := getConfigDir()
+	if err3 != nil {
+		t.Fatalf("third getConfigDir call failed: %v", err3)
+	}
+
+	// All calls should return the same result
+	if configDir1 != configDir2 {
+		t.Errorf("inconsistent results between first and second call: %s vs %s", configDir1, configDir2)
+	}
+
+	if configDir1 != configDir3 {
+		t.Errorf("inconsistent results between first and third call: %s vs %s", configDir1, configDir3)
+	}
+}
