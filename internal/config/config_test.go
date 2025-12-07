@@ -770,3 +770,438 @@ func TestLoadConfigWithComplexNesting(t *testing.T) {
 		t.Errorf("History.MaxSize mismatch: expected 1000, got %d", config.History.MaxSize)
 	}
 }
+
+// TestSaveToExplicitPath tests saving config to an explicitly specified path.
+func TestSaveToExplicitPath(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	tempDir := helper.TempDir()
+	config := SampleConfig()
+	configPath := filepath.Join(tempDir, "custom-config.yaml")
+
+	if err := config.Save(configPath); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	if !helper.FileExists(configPath) {
+		t.Fatalf("config file not created at explicit path: %s", configPath)
+	}
+
+	// Verify the saved file can be loaded and matches the original
+	loaded, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	if loaded.CurrentProvider != config.CurrentProvider {
+		t.Errorf("CurrentProvider mismatch: expected %s, got %s", config.CurrentProvider, loaded.CurrentProvider)
+	}
+}
+
+// TestSaveToDefaultConfigDirectory tests saving config to the default config directory
+// when no explicit path is provided.
+func TestSaveToDefaultConfigDirectory(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	homeDir := helper.TempDir()
+	configDir := filepath.Join(homeDir, ".config", "how")
+
+	// Temporarily override HOME to use our test directory
+	oldHome := os.Getenv("HOME")
+	if err := os.Setenv("HOME", homeDir); err != nil {
+		t.Fatalf("failed to set HOME: %v", err)
+	}
+	defer func() {
+		if oldHome != "" {
+			os.Setenv("HOME", oldHome)
+		} else {
+			os.Unsetenv("HOME")
+		}
+	}()
+
+	config := SampleConfig()
+
+	// Save with empty string to use default directory
+	if err := config.Save(""); err != nil {
+		t.Fatalf("Save to default directory failed: %v", err)
+	}
+
+	expectedConfigPath := filepath.Join(configDir, "config.yaml")
+	if !helper.FileExists(expectedConfigPath) {
+		t.Fatalf("config file not created in default directory: %s", expectedConfigPath)
+	}
+
+	// Verify the saved file can be loaded
+	loaded, err := Load("")
+	if err != nil {
+		t.Fatalf("Load from default directory failed: %v", err)
+	}
+
+	if loaded.CurrentProvider != config.CurrentProvider {
+		t.Errorf("CurrentProvider mismatch: expected %s, got %s", config.CurrentProvider, loaded.CurrentProvider)
+	}
+}
+
+// TestSaveCreatesNestedDirectories tests that Save creates nested directories as needed.
+func TestSaveCreatesNestedDirectories(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	tempDir := helper.TempDir()
+	config := SampleConfig()
+	configPath := filepath.Join(tempDir, "level1", "level2", "level3", "config.yaml")
+
+	if err := config.Save(configPath); err != nil {
+		t.Fatalf("Save with nested directories failed: %v", err)
+	}
+
+	if !helper.FileExists(configPath) {
+		t.Fatalf("config file not created with nested directories: %s", configPath)
+	}
+
+	// Verify all intermediate directories were created
+	if !helper.DirectoryExists(filepath.Join(tempDir, "level1")) {
+		t.Error("level1 directory not created")
+	}
+
+	if !helper.DirectoryExists(filepath.Join(tempDir, "level1", "level2")) {
+		t.Error("level2 directory not created")
+	}
+
+	if !helper.DirectoryExists(filepath.Join(tempDir, "level1", "level2", "level3")) {
+		t.Error("level3 directory not created")
+	}
+}
+
+// TestSaveWithComplexProviderConfig tests saving a config with multiple providers and custom headers.
+func TestSaveWithComplexProviderConfig(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	tempDir := helper.TempDir()
+	configPath := filepath.Join(tempDir, "config.yaml")
+
+	config := &Config{
+		CurrentProvider: "primary",
+		Providers: map[string]ProviderConfig{
+			"primary": {
+				Type:      "anthropic",
+				APIKey:    "key-1",
+				Model:     "model-1",
+				MaxTokens: 2048,
+				Temperature: 0.7,
+				TopP:       1.0,
+				CustomHeaders: map[string]string{
+					"X-Custom-Header": "value1",
+					"X-Another-Header": "value2",
+				},
+			},
+			"secondary": {
+				Type:      "openai",
+				APIKey:    "key-2",
+				Model:     "model-2",
+				MaxTokens: 4096,
+				Temperature: 0.5,
+			},
+		},
+		Context: ContextConfig{
+			IncludeFiles:       true,
+			IncludeHistory:     100,
+			IncludeEnvironment: true,
+			IncludeGit:         true,
+			MaxContextSize:     16000,
+			ExcludePatterns:    []string{".git", ".env", "node_modules"},
+		},
+		Display: DisplayConfig{
+			SyntaxHighlight: true,
+			ShowContext:     true,
+			Emoji:           true,
+			Color:           true,
+		},
+		History: HistoryConfig{
+			Enabled:  true,
+			MaxSize:  5000,
+			FilePath: "~/.local/share/how/history",
+		},
+	}
+
+	if err := config.Save(configPath); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	loaded, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	// Verify complex structure is preserved
+	if len(loaded.Providers) != 2 {
+		t.Errorf("expected 2 providers, got %d", len(loaded.Providers))
+	}
+
+	primaryProvider := loaded.Providers["primary"]
+	if len(primaryProvider.CustomHeaders) != 2 {
+		t.Errorf("expected 2 custom headers, got %d", len(primaryProvider.CustomHeaders))
+	}
+
+	if primaryProvider.CustomHeaders["X-Custom-Header"] != "value1" {
+		t.Errorf("custom header mismatch: expected value1, got %s", primaryProvider.CustomHeaders["X-Custom-Header"])
+	}
+
+	if len(loaded.Context.ExcludePatterns) != 3 {
+		t.Errorf("expected 3 exclude patterns, got %d", len(loaded.Context.ExcludePatterns))
+	}
+}
+
+// TestSavePreservesAllConfigFields tests that saving and loading preserves all config fields.
+func TestSavePreservesAllConfigFields(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	tempDir := helper.TempDir()
+	configPath := filepath.Join(tempDir, "config.yaml")
+
+	original := SampleConfig()
+
+	if err := original.Save(configPath); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	loaded, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	// Check all main fields
+	if loaded.CurrentProvider != original.CurrentProvider {
+		t.Errorf("CurrentProvider mismatch: expected %s, got %s", original.CurrentProvider, loaded.CurrentProvider)
+	}
+
+	if len(loaded.Providers) != len(original.Providers) {
+		t.Errorf("Providers count mismatch: expected %d, got %d", len(original.Providers), len(loaded.Providers))
+	}
+
+	// Check context config
+	if loaded.Context.IncludeFiles != original.Context.IncludeFiles {
+		t.Errorf("IncludeFiles mismatch: expected %v, got %v", original.Context.IncludeFiles, loaded.Context.IncludeFiles)
+	}
+
+	if loaded.Context.IncludeHistory != original.Context.IncludeHistory {
+		t.Errorf("IncludeHistory mismatch: expected %d, got %d", original.Context.IncludeHistory, loaded.Context.IncludeHistory)
+	}
+
+	if loaded.Context.MaxContextSize != original.Context.MaxContextSize {
+		t.Errorf("MaxContextSize mismatch: expected %d, got %d", original.Context.MaxContextSize, loaded.Context.MaxContextSize)
+	}
+
+	// Check display config
+	if loaded.Display.SyntaxHighlight != original.Display.SyntaxHighlight {
+		t.Errorf("SyntaxHighlight mismatch: expected %v, got %v", original.Display.SyntaxHighlight, loaded.Display.SyntaxHighlight)
+	}
+
+	if loaded.Display.Color != original.Display.Color {
+		t.Errorf("Color mismatch: expected %v, got %v", original.Display.Color, loaded.Color)
+	}
+
+	// Check history config
+	if loaded.History.Enabled != original.History.Enabled {
+		t.Errorf("History.Enabled mismatch: expected %v, got %v", original.History.Enabled, loaded.History.Enabled)
+	}
+
+	if loaded.History.MaxSize != original.History.MaxSize {
+		t.Errorf("History.MaxSize mismatch: expected %d, got %d", original.History.MaxSize, loaded.History.MaxSize)
+	}
+}
+
+// TestSaveOverwritesExistingFile tests that Save overwrites existing config files.
+func TestSaveOverwritesExistingFile(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	tempDir := helper.TempDir()
+	configPath := filepath.Join(tempDir, "config.yaml")
+
+	// Save initial config
+	config1 := ConfigWithProvider(t, "provider1", "type1", "key1", "model1")
+	if err := config1.Save(configPath); err != nil {
+		t.Fatalf("First save failed: %v", err)
+	}
+
+	// Verify initial save
+	loaded1, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("First load failed: %v", err)
+	}
+
+	if loaded1.CurrentProvider != "provider1" {
+		t.Errorf("first save: expected provider1, got %s", loaded1.CurrentProvider)
+	}
+
+	// Save different config to same path
+	config2 := ConfigWithProvider(t, "provider2", "type2", "key2", "model2")
+	if err := config2.Save(configPath); err != nil {
+		t.Fatalf("Second save failed: %v", err)
+	}
+
+	// Verify second save overwrote the first
+	loaded2, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Second load failed: %v", err)
+	}
+
+	if loaded2.CurrentProvider != "provider2" {
+		t.Errorf("second save: expected provider2, got %s", loaded2.CurrentProvider)
+	}
+
+	// Verify old provider is no longer in the config
+	if _, exists := loaded2.Providers["provider1"]; exists {
+		t.Error("old provider1 should not exist after overwrite")
+	}
+}
+
+// TestSaveWithEmptyConfig tests saving an empty or minimal config.
+func TestSaveWithEmptyConfig(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	tempDir := helper.TempDir()
+	configPath := filepath.Join(tempDir, "empty-config.yaml")
+
+	emptyConfig := &Config{
+		Providers: make(map[string]ProviderConfig),
+	}
+
+	if err := emptyConfig.Save(configPath); err != nil {
+		t.Fatalf("Save empty config failed: %v", err)
+	}
+
+	if !helper.FileExists(configPath) {
+		t.Fatal("config file not created for empty config")
+	}
+
+	loaded, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load empty config failed: %v", err)
+	}
+
+	if loaded == nil {
+		t.Fatal("loaded config should not be nil")
+	}
+}
+
+// TestSaveConfigFilePermissions tests that saved config file has correct permissions.
+func TestSaveConfigFilePermissions(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	tempDir := helper.TempDir()
+	configPath := filepath.Join(tempDir, "config.yaml")
+	config := SampleConfig()
+
+	if err := config.Save(configPath); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	fileInfo, err := os.Stat(configPath)
+	if err != nil {
+		t.Fatalf("Stat failed: %v", err)
+	}
+
+	// Check file permissions are 0644 (rw-r--r--)
+	expectedMode := os.FileMode(0644)
+	if fileInfo.Mode().Perm() != expectedMode {
+		t.Errorf("file permissions mismatch: expected %o, got %o", expectedMode, fileInfo.Mode().Perm())
+	}
+}
+
+// TestSaveWithSpecialCharactersInConfig tests saving config with special characters.
+func TestSaveWithSpecialCharactersInConfig(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	tempDir := helper.TempDir()
+	configPath := filepath.Join(tempDir, "special-config.yaml")
+
+	config := &Config{
+		CurrentProvider: "test",
+		Providers: map[string]ProviderConfig{
+			"test": {
+				Type:      "test",
+				APIKey:    "key-with-special-chars-!@#$%^&*()_+-=[]{}|;:,.<>?",
+				Model:     "model-with-unicode-日本語",
+				MaxTokens: 1024,
+				SystemPrompt: "You are a helpful assistant.\nWith newlines.\nAnd special chars: \"quotes\" and 'apostrophes'",
+			},
+		},
+	}
+
+	if err := config.Save(configPath); err != nil {
+		t.Fatalf("Save with special characters failed: %v", err)
+	}
+
+	loaded, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load with special characters failed: %v", err)
+	}
+
+	provider := loaded.Providers["test"]
+	if provider.APIKey != "key-with-special-chars-!@#$%^&*()_+-=[]{}|;:,.<>?" {
+		t.Errorf("APIKey with special chars not preserved: got %s", provider.APIKey)
+	}
+
+	if provider.Model != "model-with-unicode-日本語" {
+		t.Errorf("Model with unicode not preserved: got %s", provider.Model)
+	}
+}
+
+// TestSaveMultipleConfigsToSameDirectory tests saving multiple config files to the same directory.
+func TestSaveMultipleConfigsToSameDirectory(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	tempDir := helper.TempDir()
+
+	config1 := ConfigWithProvider(t, "provider1", "type1", "key1", "model1")
+	config2 := ConfigWithProvider(t, "provider2", "type2", "key2", "model2")
+
+	configPath1 := filepath.Join(tempDir, "config1.yaml")
+	configPath2 := filepath.Join(tempDir, "config2.yaml")
+
+	if err := config1.Save(configPath1); err != nil {
+		t.Fatalf("First save failed: %v", err)
+	}
+
+	if err := config2.Save(configPath2); err != nil {
+		t.Fatalf("Second save failed: %v", err)
+	}
+
+	// Verify both files exist
+	if !helper.FileExists(configPath1) {
+		t.Fatal("config1 file not created")
+	}
+
+	if !helper.FileExists(configPath2) {
+		t.Fatal("config2 file not created")
+	}
+
+	// Verify each file has the correct content
+	loaded1, err := Load(configPath1)
+	if err != nil {
+		t.Fatalf("Load config1 failed: %v", err)
+	}
+
+	if loaded1.CurrentProvider != "provider1" {
+		t.Errorf("config1 provider mismatch: expected provider1, got %s", loaded1.CurrentProvider)
+	}
+
+	loaded2, err := Load(configPath2)
+	if err != nil {
+		t.Fatalf("Load config2 failed: %v", err)
+	}
+
+	if loaded2.CurrentProvider != "provider2" {
+		t.Errorf("config2 provider mismatch: expected provider2, got %s", loaded2.CurrentProvider)
+	}
+}
