@@ -3,7 +3,10 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestLoadEmptyConfig(t *testing.T) {
@@ -1342,5 +1345,969 @@ func TestGetConfigDirConsistency(t *testing.T) {
 
 	if configDir1 != configDir3 {
 		t.Errorf("inconsistent results between first and third call: %s vs %s", configDir1, configDir3)
+	}
+}
+
+// YAML Marshaling Tests for Config Struct Types
+
+// TestProviderConfigYAMLMarshal tests marshaling a ProviderConfig to YAML.
+func TestProviderConfigYAMLMarshal(t *testing.T) {
+	provider := ProviderConfig{
+		Type:      "anthropic",
+		APIKey:    "test-key",
+		Model:     "claude-3-5-sonnet",
+		BaseURL:   "https://api.anthropic.com",
+		MaxTokens: 2048,
+	}
+
+	data, err := yaml.Marshal(provider)
+	if err != nil {
+		t.Fatalf("failed to marshal ProviderConfig: %v", err)
+	}
+
+	if data == nil || len(data) == 0 {
+		t.Fatal("expected YAML data, got empty result")
+	}
+
+	// Verify YAML contains expected fields
+	yamlStr := string(data)
+	if !strings.Contains(yamlStr, "type: anthropic") {
+		t.Errorf("expected 'type: anthropic' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "apiKey: test-key") {
+		t.Errorf("expected 'apiKey: test-key' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "maxTokens: 2048") {
+		t.Errorf("expected 'maxTokens: 2048' in YAML, got: %s", yamlStr)
+	}
+}
+
+// TestProviderConfigYAMLUnmarshal tests unmarshaling YAML to ProviderConfig.
+func TestProviderConfigYAMLUnmarshal(t *testing.T) {
+	yamlData := `type: anthropic
+apiKey: test-key
+model: claude-3-5-sonnet
+baseUrl: https://api.anthropic.com
+maxTokens: 2048
+temperature: 0.8
+topP: 0.95
+`
+
+	var provider ProviderConfig
+	err := yaml.Unmarshal([]byte(yamlData), &provider)
+	if err != nil {
+		t.Fatalf("failed to unmarshal ProviderConfig: %v", err)
+	}
+
+	if provider.Type != "anthropic" {
+		t.Errorf("type mismatch: expected anthropic, got %s", provider.Type)
+	}
+
+	if provider.APIKey != "test-key" {
+		t.Errorf("APIKey mismatch: expected test-key, got %s", provider.APIKey)
+	}
+
+	if provider.Model != "claude-3-5-sonnet" {
+		t.Errorf("model mismatch: expected claude-3-5-sonnet, got %s", provider.Model)
+	}
+
+	if provider.BaseURL != "https://api.anthropic.com" {
+		t.Errorf("baseUrl mismatch: expected https://api.anthropic.com, got %s", provider.BaseURL)
+	}
+
+	if provider.MaxTokens != 2048 {
+		t.Errorf("maxTokens mismatch: expected 2048, got %d", provider.MaxTokens)
+	}
+
+	if provider.Temperature != 0.8 {
+		t.Errorf("temperature mismatch: expected 0.8, got %f", provider.Temperature)
+	}
+
+	if provider.TopP != 0.95 {
+		t.Errorf("topP mismatch: expected 0.95, got %f", provider.TopP)
+	}
+}
+
+// TestProviderConfigYAMLRoundTrip tests that a ProviderConfig can be marshaled and unmarshaled without loss of data.
+func TestProviderConfigYAMLRoundTrip(t *testing.T) {
+	original := ProviderConfig{
+		Type:      "anthropic",
+		APIKey:    "test-key-12345",
+		Model:     "claude-3-5-sonnet-20241022",
+		BaseURL:   "https://api.anthropic.com",
+		MaxTokens: 4096,
+		Temperature: 0.7,
+		TopP:       0.99,
+		SystemPrompt: "You are a helpful assistant.",
+		CustomHeaders: map[string]string{
+			"X-Custom-Header": "value1",
+			"X-Another-Header": "value2",
+		},
+	}
+
+	// Marshal to YAML
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal ProviderConfig: %v", err)
+	}
+
+	// Unmarshal back
+	var unmarshaled ProviderConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal ProviderConfig: %v", err)
+	}
+
+	// Verify all fields match
+	if unmarshaled.Type != original.Type {
+		t.Errorf("type mismatch: expected %s, got %s", original.Type, unmarshaled.Type)
+	}
+
+	if unmarshaled.APIKey != original.APIKey {
+		t.Errorf("APIKey mismatch: expected %s, got %s", original.APIKey, unmarshaled.APIKey)
+	}
+
+	if unmarshaled.Model != original.Model {
+		t.Errorf("model mismatch: expected %s, got %s", original.Model, unmarshaled.Model)
+	}
+
+	if unmarshaled.BaseURL != original.BaseURL {
+		t.Errorf("baseUrl mismatch: expected %s, got %s", original.BaseURL, unmarshaled.BaseURL)
+	}
+
+	if unmarshaled.MaxTokens != original.MaxTokens {
+		t.Errorf("maxTokens mismatch: expected %d, got %d", original.MaxTokens, unmarshaled.MaxTokens)
+	}
+
+	if unmarshaled.Temperature != original.Temperature {
+		t.Errorf("temperature mismatch: expected %f, got %f", original.Temperature, unmarshaled.Temperature)
+	}
+
+	if unmarshaled.TopP != original.TopP {
+		t.Errorf("topP mismatch: expected %f, got %f", original.TopP, unmarshaled.TopP)
+	}
+
+	if unmarshaled.SystemPrompt != original.SystemPrompt {
+		t.Errorf("systemPrompt mismatch: expected %s, got %s", original.SystemPrompt, unmarshaled.SystemPrompt)
+	}
+
+	if len(unmarshaled.CustomHeaders) != len(original.CustomHeaders) {
+		t.Errorf("customHeaders count mismatch: expected %d, got %d", len(original.CustomHeaders), len(unmarshaled.CustomHeaders))
+	}
+
+	for key, expectedValue := range original.CustomHeaders {
+		actualValue, exists := unmarshaled.CustomHeaders[key]
+		if !exists {
+			t.Errorf("custom header %q not found in unmarshaled config", key)
+		}
+		if actualValue != expectedValue {
+			t.Errorf("custom header %q value mismatch: expected %s, got %s", key, expectedValue, actualValue)
+		}
+	}
+}
+
+// TestContextConfigYAMLMarshal tests marshaling a ContextConfig to YAML.
+func TestContextConfigYAMLMarshal(t *testing.T) {
+	context := ContextConfig{
+		IncludeFiles:       true,
+		IncludeHistory:     100,
+		IncludeEnvironment: true,
+		IncludeGit:         false,
+		MaxContextSize:     16000,
+		ExcludePatterns:    []string{".git", ".env", "node_modules"},
+	}
+
+	data, err := yaml.Marshal(context)
+	if err != nil {
+		t.Fatalf("failed to marshal ContextConfig: %v", err)
+	}
+
+	yamlStr := string(data)
+	if !strings.Contains(yamlStr, "includeFiles: true") {
+		t.Errorf("expected 'includeFiles: true' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "includeHistory: 100") {
+		t.Errorf("expected 'includeHistory: 100' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "maxContextSize: 16000") {
+		t.Errorf("expected 'maxContextSize: 16000' in YAML, got: %s", yamlStr)
+	}
+}
+
+// TestContextConfigYAMLUnmarshal tests unmarshaling YAML to ContextConfig.
+func TestContextConfigYAMLUnmarshal(t *testing.T) {
+	yamlData := `includeFiles: true
+includeHistory: 100
+includeEnvironment: false
+includeGit: true
+maxContextSize: 12000
+excludePatterns:
+  - .git
+  - node_modules
+  - .env
+`
+
+	var context ContextConfig
+	err := yaml.Unmarshal([]byte(yamlData), &context)
+	if err != nil {
+		t.Fatalf("failed to unmarshal ContextConfig: %v", err)
+	}
+
+	if !context.IncludeFiles {
+		t.Error("expected IncludeFiles to be true")
+	}
+
+	if context.IncludeHistory != 100 {
+		t.Errorf("includeHistory mismatch: expected 100, got %d", context.IncludeHistory)
+	}
+
+	if context.IncludeEnvironment {
+		t.Error("expected IncludeEnvironment to be false")
+	}
+
+	if !context.IncludeGit {
+		t.Error("expected IncludeGit to be true")
+	}
+
+	if context.MaxContextSize != 12000 {
+		t.Errorf("maxContextSize mismatch: expected 12000, got %d", context.MaxContextSize)
+	}
+
+	if len(context.ExcludePatterns) != 3 {
+		t.Errorf("excludePatterns count mismatch: expected 3, got %d", len(context.ExcludePatterns))
+	}
+}
+
+// TestContextConfigYAMLRoundTrip tests that a ContextConfig can be marshaled and unmarshaled without loss of data.
+func TestContextConfigYAMLRoundTrip(t *testing.T) {
+	original := ContextConfig{
+		IncludeFiles:       true,
+		IncludeHistory:     50,
+		IncludeEnvironment: true,
+		IncludeGit:         true,
+		MaxContextSize:     8000,
+		ExcludePatterns:    []string{".git", ".env", "node_modules", ".vscode"},
+	}
+
+	// Marshal to YAML
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal ContextConfig: %v", err)
+	}
+
+	// Unmarshal back
+	var unmarshaled ContextConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal ContextConfig: %v", err)
+	}
+
+	// Verify all fields match
+	if unmarshaled.IncludeFiles != original.IncludeFiles {
+		t.Errorf("IncludeFiles mismatch: expected %v, got %v", original.IncludeFiles, unmarshaled.IncludeFiles)
+	}
+
+	if unmarshaled.IncludeHistory != original.IncludeHistory {
+		t.Errorf("IncludeHistory mismatch: expected %d, got %d", original.IncludeHistory, unmarshaled.IncludeHistory)
+	}
+
+	if unmarshaled.IncludeEnvironment != original.IncludeEnvironment {
+		t.Errorf("IncludeEnvironment mismatch: expected %v, got %v", original.IncludeEnvironment, unmarshaled.IncludeEnvironment)
+	}
+
+	if unmarshaled.IncludeGit != original.IncludeGit {
+		t.Errorf("IncludeGit mismatch: expected %v, got %v", original.IncludeGit, unmarshaled.IncludeGit)
+	}
+
+	if unmarshaled.MaxContextSize != original.MaxContextSize {
+		t.Errorf("MaxContextSize mismatch: expected %d, got %d", original.MaxContextSize, unmarshaled.MaxContextSize)
+	}
+
+	if len(unmarshaled.ExcludePatterns) != len(original.ExcludePatterns) {
+		t.Errorf("ExcludePatterns count mismatch: expected %d, got %d", len(original.ExcludePatterns), len(unmarshaled.ExcludePatterns))
+	}
+
+	for i, pattern := range original.ExcludePatterns {
+		if unmarshaled.ExcludePatterns[i] != pattern {
+			t.Errorf("ExcludePatterns[%d] mismatch: expected %s, got %s", i, pattern, unmarshaled.ExcludePatterns[i])
+		}
+	}
+}
+
+// TestDisplayConfigYAMLMarshal tests marshaling a DisplayConfig to YAML.
+func TestDisplayConfigYAMLMarshal(t *testing.T) {
+	display := DisplayConfig{
+		SyntaxHighlight: true,
+		ShowContext:     false,
+		Emoji:           true,
+		Color:           true,
+	}
+
+	data, err := yaml.Marshal(display)
+	if err != nil {
+		t.Fatalf("failed to marshal DisplayConfig: %v", err)
+	}
+
+	yamlStr := string(data)
+	if !strings.Contains(yamlStr, "syntaxHighlight: true") {
+		t.Errorf("expected 'syntaxHighlight: true' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "showContext: false") {
+		t.Errorf("expected 'showContext: false' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "emoji: true") {
+		t.Errorf("expected 'emoji: true' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "color: true") {
+		t.Errorf("expected 'color: true' in YAML, got: %s", yamlStr)
+	}
+}
+
+// TestDisplayConfigYAMLUnmarshal tests unmarshaling YAML to DisplayConfig.
+func TestDisplayConfigYAMLUnmarshal(t *testing.T) {
+	yamlData := `syntaxHighlight: true
+showContext: true
+emoji: false
+color: true
+`
+
+	var display DisplayConfig
+	err := yaml.Unmarshal([]byte(yamlData), &display)
+	if err != nil {
+		t.Fatalf("failed to unmarshal DisplayConfig: %v", err)
+	}
+
+	if !display.SyntaxHighlight {
+		t.Error("expected SyntaxHighlight to be true")
+	}
+
+	if !display.ShowContext {
+		t.Error("expected ShowContext to be true")
+	}
+
+	if display.Emoji {
+		t.Error("expected Emoji to be false")
+	}
+
+	if !display.Color {
+		t.Error("expected Color to be true")
+	}
+}
+
+// TestDisplayConfigYAMLRoundTrip tests that a DisplayConfig can be marshaled and unmarshaled without loss of data.
+func TestDisplayConfigYAMLRoundTrip(t *testing.T) {
+	original := DisplayConfig{
+		SyntaxHighlight: true,
+		ShowContext:     true,
+		Emoji:           false,
+		Color:           true,
+	}
+
+	// Marshal to YAML
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal DisplayConfig: %v", err)
+	}
+
+	// Unmarshal back
+	var unmarshaled DisplayConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal DisplayConfig: %v", err)
+	}
+
+	// Verify all fields match
+	if unmarshaled.SyntaxHighlight != original.SyntaxHighlight {
+		t.Errorf("SyntaxHighlight mismatch: expected %v, got %v", original.SyntaxHighlight, unmarshaled.SyntaxHighlight)
+	}
+
+	if unmarshaled.ShowContext != original.ShowContext {
+		t.Errorf("ShowContext mismatch: expected %v, got %v", original.ShowContext, unmarshaled.ShowContext)
+	}
+
+	if unmarshaled.Emoji != original.Emoji {
+		t.Errorf("Emoji mismatch: expected %v, got %v", original.Emoji, unmarshaled.Emoji)
+	}
+
+	if unmarshaled.Color != original.Color {
+		t.Errorf("Color mismatch: expected %v, got %v", original.Color, unmarshaled.Color)
+	}
+}
+
+// TestHistoryConfigYAMLMarshal tests marshaling a HistoryConfig to YAML.
+func TestHistoryConfigYAMLMarshal(t *testing.T) {
+	history := HistoryConfig{
+		Enabled:  true,
+		MaxSize:  5000,
+		FilePath: "~/.local/share/how/history",
+	}
+
+	data, err := yaml.Marshal(history)
+	if err != nil {
+		t.Fatalf("failed to marshal HistoryConfig: %v", err)
+	}
+
+	yamlStr := string(data)
+	if !strings.Contains(yamlStr, "enabled: true") {
+		t.Errorf("expected 'enabled: true' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "maxSize: 5000") {
+		t.Errorf("expected 'maxSize: 5000' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "filePath:") {
+		t.Errorf("expected 'filePath:' in YAML, got: %s", yamlStr)
+	}
+}
+
+// TestHistoryConfigYAMLUnmarshal tests unmarshaling YAML to HistoryConfig.
+func TestHistoryConfigYAMLUnmarshal(t *testing.T) {
+	yamlData := `enabled: true
+maxSize: 2000
+filePath: /home/user/.local/share/how/history
+`
+
+	var history HistoryConfig
+	err := yaml.Unmarshal([]byte(yamlData), &history)
+	if err != nil {
+		t.Fatalf("failed to unmarshal HistoryConfig: %v", err)
+	}
+
+	if !history.Enabled {
+		t.Error("expected Enabled to be true")
+	}
+
+	if history.MaxSize != 2000 {
+		t.Errorf("maxSize mismatch: expected 2000, got %d", history.MaxSize)
+	}
+
+	if history.FilePath != "/home/user/.local/share/how/history" {
+		t.Errorf("filePath mismatch: expected /home/user/.local/share/how/history, got %s", history.FilePath)
+	}
+}
+
+// TestHistoryConfigYAMLRoundTrip tests that a HistoryConfig can be marshaled and unmarshaled without loss of data.
+func TestHistoryConfigYAMLRoundTrip(t *testing.T) {
+	original := HistoryConfig{
+		Enabled:  true,
+		MaxSize:  3000,
+		FilePath: "/home/user/.config/how/history",
+	}
+
+	// Marshal to YAML
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal HistoryConfig: %v", err)
+	}
+
+	// Unmarshal back
+	var unmarshaled HistoryConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal HistoryConfig: %v", err)
+	}
+
+	// Verify all fields match
+	if unmarshaled.Enabled != original.Enabled {
+		t.Errorf("Enabled mismatch: expected %v, got %v", original.Enabled, unmarshaled.Enabled)
+	}
+
+	if unmarshaled.MaxSize != original.MaxSize {
+		t.Errorf("MaxSize mismatch: expected %d, got %d", original.MaxSize, unmarshaled.MaxSize)
+	}
+
+	if unmarshaled.FilePath != original.FilePath {
+		t.Errorf("FilePath mismatch: expected %s, got %s", original.FilePath, unmarshaled.FilePath)
+	}
+}
+
+// TestConfigYAMLMarshal tests marshaling a complete Config to YAML.
+func TestConfigYAMLMarshal(t *testing.T) {
+	config := SampleConfig()
+
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		t.Fatalf("failed to marshal Config: %v", err)
+	}
+
+	yamlStr := string(data)
+	if !strings.Contains(yamlStr, "currentProvider: anthropic") {
+		t.Errorf("expected 'currentProvider: anthropic' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "providers:") {
+		t.Errorf("expected 'providers:' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "context:") {
+		t.Errorf("expected 'context:' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "display:") {
+		t.Errorf("expected 'display:' in YAML, got: %s", yamlStr)
+	}
+
+	if !strings.Contains(yamlStr, "history:") {
+		t.Errorf("expected 'history:' in YAML, got: %s", yamlStr)
+	}
+}
+
+// TestConfigYAMLUnmarshal tests unmarshaling YAML to Config.
+func TestConfigYAMLUnmarshal(t *testing.T) {
+	yamlData := `currentProvider: anthropic
+providers:
+  anthropic:
+    type: anthropic
+    apiKey: sk-ant-test
+    model: claude-3-5-sonnet
+    maxTokens: 2048
+context:
+  includeFiles: true
+  includeHistory: 50
+  includeEnvironment: false
+  includeGit: true
+  maxContextSize: 8000
+  excludePatterns:
+    - .git
+    - node_modules
+display:
+  syntaxHighlight: true
+  showContext: true
+  emoji: false
+  color: true
+history:
+  enabled: true
+  maxSize: 1000
+  filePath: ~/.local/share/how/history
+`
+
+	var config Config
+	err := yaml.Unmarshal([]byte(yamlData), &config)
+	if err != nil {
+		t.Fatalf("failed to unmarshal Config: %v", err)
+	}
+
+	if config.CurrentProvider != "anthropic" {
+		t.Errorf("currentProvider mismatch: expected anthropic, got %s", config.CurrentProvider)
+	}
+
+	if len(config.Providers) != 1 {
+		t.Errorf("providers count mismatch: expected 1, got %d", len(config.Providers))
+	}
+
+	provider, exists := config.Providers["anthropic"]
+	if !exists {
+		t.Fatal("anthropic provider not found")
+	}
+
+	if provider.Type != "anthropic" {
+		t.Errorf("provider type mismatch: expected anthropic, got %s", provider.Type)
+	}
+
+	if provider.APIKey != "sk-ant-test" {
+		t.Errorf("provider apiKey mismatch: expected sk-ant-test, got %s", provider.APIKey)
+	}
+
+	if config.Context.IncludeFiles {
+		if !config.Context.IncludeFiles {
+			t.Error("expected context.includeFiles to be true")
+		}
+	}
+
+	if !config.Display.SyntaxHighlight {
+		t.Error("expected display.syntaxHighlight to be true")
+	}
+
+	if !config.History.Enabled {
+		t.Error("expected history.enabled to be true")
+	}
+}
+
+// TestConfigYAMLRoundTrip tests that a Config can be marshaled and unmarshaled without loss of data.
+func TestConfigYAMLRoundTrip(t *testing.T) {
+	original := &Config{
+		CurrentProvider: "anthropic",
+		Providers: map[string]ProviderConfig{
+			"anthropic": {
+				Type:      "anthropic",
+				APIKey:    "sk-ant-test-key",
+				Model:     "claude-3-5-sonnet-20241022",
+				BaseURL:   "https://api.anthropic.com",
+				MaxTokens: 4096,
+				Temperature: 0.7,
+				TopP:       1.0,
+				SystemPrompt: "You are a helpful assistant",
+				CustomHeaders: map[string]string{
+					"X-Custom": "header",
+				},
+			},
+			"backup": {
+				Type:      "openai",
+				APIKey:    "sk-openai-test",
+				Model:     "gpt-4",
+				MaxTokens: 8192,
+				Temperature: 0.8,
+			},
+		},
+		Context: ContextConfig{
+			IncludeFiles:       true,
+			IncludeHistory:     100,
+			IncludeEnvironment: true,
+			IncludeGit:         true,
+			MaxContextSize:     16000,
+			ExcludePatterns:    []string{".git", ".env", "node_modules"},
+		},
+		Display: DisplayConfig{
+			SyntaxHighlight: true,
+			ShowContext:     true,
+			Emoji:           true,
+			Color:           true,
+		},
+		History: HistoryConfig{
+			Enabled:  true,
+			MaxSize:  5000,
+			FilePath: "~/.local/share/how/history",
+		},
+	}
+
+	// Marshal to YAML
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal Config: %v", err)
+	}
+
+	// Unmarshal back
+	var unmarshaled Config
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal Config: %v", err)
+	}
+
+	// Verify main fields
+	if unmarshaled.CurrentProvider != original.CurrentProvider {
+		t.Errorf("currentProvider mismatch: expected %s, got %s", original.CurrentProvider, unmarshaled.CurrentProvider)
+	}
+
+	if len(unmarshaled.Providers) != len(original.Providers) {
+		t.Errorf("providers count mismatch: expected %d, got %d", len(original.Providers), len(unmarshaled.Providers))
+	}
+
+	// Verify provider details
+	for name, originalProvider := range original.Providers {
+		unmarshaledProvider, exists := unmarshaled.Providers[name]
+		if !exists {
+			t.Errorf("provider %q not found in unmarshaled config", name)
+			continue
+		}
+
+		if unmarshaledProvider.Type != originalProvider.Type {
+			t.Errorf("provider %q type mismatch: expected %s, got %s", name, originalProvider.Type, unmarshaledProvider.Type)
+		}
+
+		if unmarshaledProvider.APIKey != originalProvider.APIKey {
+			t.Errorf("provider %q apiKey mismatch: expected %s, got %s", name, originalProvider.APIKey, unmarshaledProvider.APIKey)
+		}
+
+		if unmarshaledProvider.Model != originalProvider.Model {
+			t.Errorf("provider %q model mismatch: expected %s, got %s", name, originalProvider.Model, unmarshaledProvider.Model)
+		}
+
+		if unmarshaledProvider.MaxTokens != originalProvider.MaxTokens {
+			t.Errorf("provider %q maxTokens mismatch: expected %d, got %d", name, originalProvider.MaxTokens, unmarshaledProvider.MaxTokens)
+		}
+	}
+
+	// Verify context fields
+	if unmarshaled.Context.IncludeFiles != original.Context.IncludeFiles {
+		t.Errorf("context.includeFiles mismatch: expected %v, got %v", original.Context.IncludeFiles, unmarshaled.Context.IncludeFiles)
+	}
+
+	if unmarshaled.Context.IncludeHistory != original.Context.IncludeHistory {
+		t.Errorf("context.includeHistory mismatch: expected %d, got %d", original.Context.IncludeHistory, unmarshaled.Context.IncludeHistory)
+	}
+
+	if unmarshaled.Context.MaxContextSize != original.Context.MaxContextSize {
+		t.Errorf("context.maxContextSize mismatch: expected %d, got %d", original.Context.MaxContextSize, unmarshaled.Context.MaxContextSize)
+	}
+
+	// Verify display fields
+	if unmarshaled.Display.SyntaxHighlight != original.Display.SyntaxHighlight {
+		t.Errorf("display.syntaxHighlight mismatch: expected %v, got %v", original.Display.SyntaxHighlight, unmarshaled.Display.SyntaxHighlight)
+	}
+
+	if unmarshaled.Display.ShowContext != original.Display.ShowContext {
+		t.Errorf("display.showContext mismatch: expected %v, got %v", original.Display.ShowContext, unmarshaled.Display.ShowContext)
+	}
+
+	if unmarshaled.Display.Emoji != original.Display.Emoji {
+		t.Errorf("display.emoji mismatch: expected %v, got %v", original.Display.Emoji, unmarshaled.Display.Emoji)
+	}
+
+	if unmarshaled.Display.Color != original.Display.Color {
+		t.Errorf("display.color mismatch: expected %v, got %v", original.Display.Color, unmarshaled.Display.Color)
+	}
+
+	// Verify history fields
+	if unmarshaled.History.Enabled != original.History.Enabled {
+		t.Errorf("history.enabled mismatch: expected %v, got %v", original.History.Enabled, unmarshaled.History.Enabled)
+	}
+
+	if unmarshaled.History.MaxSize != original.History.MaxSize {
+		t.Errorf("history.maxSize mismatch: expected %d, got %d", original.History.MaxSize, unmarshaled.History.MaxSize)
+	}
+
+	if unmarshaled.History.FilePath != original.History.FilePath {
+		t.Errorf("history.filePath mismatch: expected %s, got %s", original.History.FilePath, unmarshaled.History.FilePath)
+	}
+}
+
+// TestConfigWithMinimalFields tests marshaling and unmarshaling Config with minimal field combinations.
+func TestConfigWithMinimalFields(t *testing.T) {
+	original := &Config{
+		CurrentProvider: "minimal",
+		Providers: map[string]ProviderConfig{
+			"minimal": {
+				Type:      "test",
+				APIKey:    "key",
+				Model:     "model",
+				MaxTokens: 1024,
+			},
+		},
+		Context:  ContextConfig{},
+		Display:  DisplayConfig{},
+		History:  HistoryConfig{},
+	}
+
+	// Marshal to YAML
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal minimal Config: %v", err)
+	}
+
+	// Unmarshal back
+	var unmarshaled Config
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal minimal Config: %v", err)
+	}
+
+	if unmarshaled.CurrentProvider != original.CurrentProvider {
+		t.Errorf("currentProvider mismatch: expected %s, got %s", original.CurrentProvider, unmarshaled.CurrentProvider)
+	}
+
+	if len(unmarshaled.Providers) != 1 {
+		t.Errorf("providers count mismatch: expected 1, got %d", len(unmarshaled.Providers))
+	}
+}
+
+// TestConfigWithMultipleProviderTypes tests marshaling and unmarshaling Config with multiple different provider types.
+func TestConfigWithMultipleProviderTypes(t *testing.T) {
+	original := &Config{
+		CurrentProvider: "primary",
+		Providers: map[string]ProviderConfig{
+			"primary": {
+				Type:      "anthropic",
+				APIKey:    "sk-ant-key",
+				Model:     "claude-3-5-sonnet",
+				MaxTokens: 2048,
+				Temperature: 0.7,
+			},
+			"secondary": {
+				Type:      "openai",
+				APIKey:    "sk-openai-key",
+				Model:     "gpt-4",
+				MaxTokens: 4096,
+				Temperature: 0.5,
+			},
+			"tertiary": {
+				Type:      "local",
+				APIKey:    "local-key",
+				Model:     "llama-2",
+				MaxTokens: 8192,
+				BaseURL:   "http://localhost:8000",
+				Temperature: 0.9,
+			},
+		},
+		Context: ContextConfig{
+			IncludeFiles:       true,
+			IncludeHistory:     100,
+			IncludeEnvironment: true,
+			MaxContextSize:     10000,
+		},
+		Display: DisplayConfig{
+			SyntaxHighlight: true,
+			ShowContext:     true,
+			Color:           true,
+		},
+		History: HistoryConfig{
+			Enabled:  true,
+			MaxSize:  2000,
+			FilePath: "/var/log/how/history",
+		},
+	}
+
+	// Marshal to YAML
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal Config with multiple providers: %v", err)
+	}
+
+	// Unmarshal back
+	var unmarshaled Config
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal Config with multiple providers: %v", err)
+	}
+
+	// Verify all providers are present
+	if len(unmarshaled.Providers) != 3 {
+		t.Errorf("expected 3 providers, got %d", len(unmarshaled.Providers))
+	}
+
+	for expectedName := range original.Providers {
+		if _, exists := unmarshaled.Providers[expectedName]; !exists {
+			t.Errorf("provider %q not found in unmarshaled config", expectedName)
+		}
+	}
+
+	// Verify specific provider details
+	primaryProvider := unmarshaled.Providers["primary"]
+	if primaryProvider.Type != "anthropic" {
+		t.Errorf("primary provider type mismatch: expected anthropic, got %s", primaryProvider.Type)
+	}
+
+	tertiaryProvider := unmarshaled.Providers["tertiary"]
+	if tertiaryProvider.BaseURL != "http://localhost:8000" {
+		t.Errorf("tertiary provider baseUrl mismatch: expected http://localhost:8000, got %s", tertiaryProvider.BaseURL)
+	}
+}
+
+// TestConfigWithOmittedFields tests that omitted fields (with omitempty tags) are handled correctly.
+func TestConfigWithOmittedFields(t *testing.T) {
+	original := &Config{
+		CurrentProvider: "test",
+		Providers: map[string]ProviderConfig{
+			"test": {
+				Type:      "test",
+				APIKey:    "key",
+				Model:     "model",
+				MaxTokens: 1024,
+				// BaseURL, Temperature, TopP, SystemPrompt, CustomHeaders are omitted
+			},
+		},
+	}
+
+	// Marshal to YAML
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal Config with omitted fields: %v", err)
+	}
+
+	yamlStr := string(data)
+
+	// Verify that empty optional fields are omitted
+	if strings.Contains(yamlStr, "baseUrl:") && !strings.Contains(yamlStr, "baseUrl: null") {
+		t.Errorf("expected baseUrl to be omitted or null, got: %s", yamlStr)
+	}
+
+	// Unmarshal back
+	var unmarshaled Config
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal Config with omitted fields: %v", err)
+	}
+
+	provider := unmarshaled.Providers["test"]
+	if provider.BaseURL != "" {
+		t.Errorf("expected BaseURL to be empty, got %s", provider.BaseURL)
+	}
+
+	if provider.Temperature != 0 {
+		t.Errorf("expected Temperature to be 0, got %f", provider.Temperature)
+	}
+}
+
+// TestContextConfigEmptyExcludePatterns tests marshaling and unmarshaling with empty exclude patterns.
+func TestContextConfigEmptyExcludePatterns(t *testing.T) {
+	original := ContextConfig{
+		IncludeFiles:       true,
+		IncludeHistory:     50,
+		IncludeEnvironment: false,
+		IncludeGit:         true,
+		MaxContextSize:     8000,
+		ExcludePatterns:    []string{},
+	}
+
+	// Marshal to YAML
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal ContextConfig with empty patterns: %v", err)
+	}
+
+	// Unmarshal back
+	var unmarshaled ContextConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal ContextConfig with empty patterns: %v", err)
+	}
+
+	if len(unmarshaled.ExcludePatterns) != 0 && unmarshaled.ExcludePatterns != nil {
+		t.Errorf("expected empty ExcludePatterns, got %v", unmarshaled.ExcludePatterns)
+	}
+}
+
+// TestConfigWithSpecialCharactersInFields tests marshaling and unmarshaling with special characters.
+func TestConfigWithSpecialCharactersInFields(t *testing.T) {
+	original := &Config{
+		CurrentProvider: "special",
+		Providers: map[string]ProviderConfig{
+			"special": {
+				Type:      "special",
+				APIKey:    "key-with-special-!@#$%^&*()",
+				Model:     "model-with-unicode-日本語",
+				MaxTokens: 2048,
+				SystemPrompt: "You are helpful.\nMultiline.\n\"Quoted\" text.",
+				CustomHeaders: map[string]string{
+					"X-Special": "value with special: chars!",
+				},
+			},
+		},
+		Display: DisplayConfig{
+			SyntaxHighlight: true,
+		},
+	}
+
+	// Marshal to YAML
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal Config with special characters: %v", err)
+	}
+
+	// Unmarshal back
+	var unmarshaled Config
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal Config with special characters: %v", err)
+	}
+
+	provider := unmarshaled.Providers["special"]
+	if provider.APIKey != "key-with-special-!@#$%^&*()" {
+		t.Errorf("special characters in APIKey not preserved: got %s", provider.APIKey)
+	}
+
+	if provider.Model != "model-with-unicode-日本語" {
+		t.Errorf("unicode characters in Model not preserved: got %s", provider.Model)
+	}
+
+	if provider.SystemPrompt != "You are helpful.\nMultiline.\n\"Quoted\" text." {
+		t.Errorf("multiline and quoted text in SystemPrompt not preserved: got %s", provider.SystemPrompt)
 	}
 }
