@@ -1,149 +1,19 @@
 project:
-  name: How
-  type: CLI Tool
-  description: AI-powered shell assistant providing context-aware command help, code
-    generation, and explanations
-  language: Go
-  version: 1.0.0
-  repository: github.com/Codilas/how
+  name: how
+  type: web-app
+  description: Project analysis failed - using fallback configuration
 codebase_map:
-  structure:
-    cmd/:
-      purpose: Command-line application entry point and root command handler
-    internal/:
-      purpose: Private packages - CLI commands, configuration, context collection,
-        provider management
-    pkg/:
-      purpose: Public reusable packages - provider interfaces, text formatting, command
-        extraction
-    scripts/:
-      purpose: Installation and utility scripts
-  packages:
-    internal/cli:
-      purpose: Cobra-based command definitions (root, setup, history, install, providers)
-      key_files: root.go, setup.go, providers.go, history.go
-    internal/config:
-      purpose: Configuration loading/saving via Viper, YAML-based settings with environment
-        overrides
-      key_files: config.go
-    internal/context:
-      purpose: Shell context gathering - directory, environment, git info, command
-        history, project detection
-      key_files: context.go, git.go, history.go, project.go
-    internal/manager:
-      purpose: Provider lifecycle management - factory pattern for AI provider instantiation
-        and selection
-      key_files: manager.go, factory.go
-    pkg/providers:
-      purpose: Provider abstraction layer defining standard interface for all AI backends
-      key_files: interface.go, types.go, errors.go, anthropic/provider.go
-    pkg/extractor:
-      purpose: Command extraction and parsing from AI responses
-      key_files: command.go
-    pkg/text:
-      purpose: Terminal output formatting with syntax highlighting and structured
-        rendering
-      key_files: formatter.go
-    pkg/version:
-      purpose: Version metadata injected at build time
-      key_files: version.go
+  note: Analysis failed - manual review required
 tech_stack:
-  language: Go 1.22.4
-  frameworks:
-  - Cobra 1.9.1 (CLI commands and flags)
-  - Viper 1.20.1 (configuration management)
-  ui_libraries:
-  - survey/v2 (interactive prompts)
-  - briandowns/spinner (loading animations)
-  - fatih/color (terminal colors)
-  data_formats: YAML (gopkg.in/yaml.v3)
-  build_system: Makefile with cross-platform release support
+  detected: false
+  note: Could not analyze tech stack automatically
 purpose:
-  mission: Provide intelligent shell assistance with context awareness and multi-provider
-    AI support
-  key_features:
-  - Context-aware AI assistance (working directory, environment, git, command history)
-  - Multi-provider support (Anthropic Claude with pluggable architecture for others)
-  - Interactive setup wizard
-  - Command suggestion with safety warnings
-  - Syntax-highlighted formatted responses
-  - Streaming and non-streaming response modes
-  architecture_patterns:
-  - Provider abstraction (pluggable backend support)
-  - Manager pattern (provider lifecycle and selection)
-  - Configuration-driven multi-backend design
-  - Context collector pattern (composable environment awareness)
-  - Factory pattern (dynamic provider instantiation)
+  note: Project purpose could not be determined automatically
 development:
-  setup_dev_env: make setup-dev
-  essential_commands:
-    build: make build
-    dev_build: make dev (with race detection)
-    test: make test
-    test_race: make test-race
-    lint: make lint (requires golangci-lint)
-    format: make fmt
-    clean: make clean
-    deps: make deps (go mod tidy + download)
-  install_local: make install (installs to ~/.local/bin)
-  workflow:
-    1_setup: make setup-dev
-    2_edit: Edit code in cmd/, internal/, or pkg/
-    3_test: make test
-    4_build: make build
-    5_run: ./bin/how "your prompt"
-  version_info: Injected at build via LDFLAGS (version, git commit, build date)
+  setup: npm install
+  note: Default setup command - verify manually
 verification:
-  build_check: make build
-  test_check: make test
-  lint_check: make lint
-  race_detection: make test-race
-  multiplatform_release: make release (builds linux/darwin/windows)
-  quality_gates:
-    required:
-    - Build succeeds without errors
-    - All tests pass
-    optional:
-    - golangci-lint returns no errors
-    - Code formatted with go fmt
+  build: npm run build
+  note: Default build command - verify manually
 conventions:
-  naming:
-    packages: lowercase single-word (cli, config, manager)
-    functions: camelCase, PascalCase for exported functions
-    files: descriptive snake_case.go
-  code_patterns:
-    config_management: Use Viper for all configuration loading/saving
-    cli_commands: Define via Cobra, organize in internal/cli
-    errors: Return errors explicitly, never panic in production
-    context: Always gather and pass shell context to AI provider
-    providers: Implement providers.Provider interface for new backends
-  directory_structure:
-    config: ~/.config/how/config.yaml (respects XDG_CONFIG_HOME)
-    installation: ~/.local/bin/how or /usr/local/bin/how
-detailed_guides:
-- path: .opsee/guides/ai-provider-integration.md
-  when: Adding new AI provider or modifying provider architecture
-- path: .opsee/guides/context-collection.md
-  when: Enhancing shell context capture or environment awareness
-- path: .opsee/guides/cli-commands.md
-  when: Adding new commands or modifying command structure
-- path: .opsee/guides/build-deployment.md
-  when: Building releases or modifying cross-platform build process
-critical_files:
-  cmd/how/main.go: Application entry point, calls cli.Execute()
-  internal/cli/root.go: Root command definition, prompt handling, provider initialization
-  internal/config/config.go: Config loading via Viper, environment variable support
-  internal/context/context.go: Context gathering orchestration
-  internal/manager/manager.go: Provider lifecycle, selection, scoring
-  pkg/providers/interface.go: Standard Provider interface all backends must implement
-  pkg/providers/anthropic/provider.go: Claude API implementation
-git:
-  main_branch: main
-  workflow: Feature branches, PR merge to main
-  quality_checks:
-    required:
-    - Build passes
-    - Tests pass
-    optional:
-    - Code lint clean
-    - Documentation updated
+  note: Code conventions could not be analyzed automatically
