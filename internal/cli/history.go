@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -27,27 +28,33 @@ func init() {
 }
 
 func runHistory(cmd *cobra.Command, args []string) {
-	historyFile := getHistoryFile()
+	runHistoryWithWriter(os.Stdout, os.Stderr, getHistoryFile)
+}
+
+// runHistoryWithWriter is the testable implementation of runHistory.
+// It accepts output writers and a function to get the history file path.
+func runHistoryWithWriter(stdout, stderr io.Writer, getHistoryFileFn func() string) {
+	historyFile := getHistoryFileFn()
 
 	if _, err := os.Stat(historyFile); os.IsNotExist(err) {
-		fmt.Println("📜 No conversation history found.")
+		fmt.Fprintln(stdout, "📜 No conversation history found.")
 		return
 	}
 
 	content, err := os.ReadFile(historyFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading history: %v\n", err)
+		fmt.Fprintf(stderr, "Error reading history: %v\n", err)
 		return
 	}
 
 	if len(content) == 0 {
-		fmt.Println("📜 No conversation history found.")
+		fmt.Fprintln(stdout, "📜 No conversation history found.")
 		return
 	}
 
-	fmt.Println("📜 Recent conversations:")
-	fmt.Println()
-	fmt.Print(string(content))
+	fmt.Fprintln(stdout, "📜 Recent conversations:")
+	fmt.Fprintln(stdout)
+	fmt.Fprint(stdout, string(content))
 }
 
 func runClearHistory(cmd *cobra.Command, args []string) {
