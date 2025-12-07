@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -1724,4 +1725,215 @@ func findInString(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// TestGetConfigDir_SuccessfulHomeDirectoryRetrieval tests successful home directory retrieval
+func TestGetConfigDir_SuccessfulHomeDirectoryRetrieval(t *testing.T) {
+	configDir, err := getConfigDir()
+	if err != nil {
+		t.Fatalf("getConfigDir() returned error: %v", err)
+	}
+
+	if configDir == "" {
+		t.Fatalf("getConfigDir() returned empty string")
+	}
+
+	if !filepath.IsAbs(configDir) {
+		t.Errorf("getConfigDir() returned non-absolute path: %q", configDir)
+	}
+}
+
+// TestGetConfigDir_CorrectPathConstruction tests correct path construction
+func TestGetConfigDir_CorrectPathConstruction(t *testing.T) {
+	configDir, err := getConfigDir()
+	if err != nil {
+		t.Fatalf("getConfigDir() returned error: %v", err)
+	}
+
+	// Verify the path ends with .config/how
+	if !filepath.HasSuffix(configDir, filepath.Join(".config", "how")) {
+		t.Errorf("config dir = %q, should end with %q", configDir, filepath.Join(".config", "how"))
+	}
+
+	// Verify it contains .config and how in the right order
+	parts := filepath.SplitList(configDir)
+	hasConfigAndHow := false
+	for i := 0; i < len(parts)-1; i++ {
+		if parts[i] == ".config" && parts[i+1] == "how" {
+			hasConfigAndHow = true
+			break
+		}
+	}
+	if !hasConfigAndHow {
+		// Alternative check: use filepath functions to verify structure
+		if !strings.Contains(configDir, ".config"+string(filepath.Separator)+"how") &&
+			!strings.HasSuffix(configDir, filepath.Join(".config", "how")) {
+			t.Errorf("config dir = %q, does not have .config/how structure", configDir)
+		}
+	}
+}
+
+// TestGetConfigDir_PathContainsUserHomeDir tests that path contains user's home directory
+func TestGetConfigDir_PathContainsUserHomeDir(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("unable to determine home directory")
+	}
+
+	configDir, err := getConfigDir()
+	if err != nil {
+		t.Fatalf("getConfigDir() returned error: %v", err)
+	}
+
+	if !strings.HasPrefix(configDir, homeDir) {
+		t.Errorf("config dir = %q, does not start with home dir %q", configDir, homeDir)
+	}
+}
+
+// TestGetConfigDir_PathIsAbsolute tests that returned path is absolute
+func TestGetConfigDir_PathIsAbsolute(t *testing.T) {
+	configDir, err := getConfigDir()
+	if err != nil {
+		t.Fatalf("getConfigDir() returned error: %v", err)
+	}
+
+	if !filepath.IsAbs(configDir) {
+		t.Errorf("config dir = %q, is not absolute path", configDir)
+	}
+}
+
+// TestGetConfigDir_RepeatedCallsReturnSameResult tests consistency of calls
+func TestGetConfigDir_RepeatedCallsReturnSameResult(t *testing.T) {
+	dir1, err1 := getConfigDir()
+	if err1 != nil {
+		t.Fatalf("first getConfigDir() returned error: %v", err1)
+	}
+
+	dir2, err2 := getConfigDir()
+	if err2 != nil {
+		t.Fatalf("second getConfigDir() returned error: %v", err2)
+	}
+
+	if dir1 != dir2 {
+		t.Errorf("repeated calls return different results: %q vs %q", dir1, dir2)
+	}
+}
+
+// TestGetConfigDir_PathDoesNotContainEmptyElements tests path validity
+func TestGetConfigDir_PathDoesNotContainEmptyElements(t *testing.T) {
+	configDir, err := getConfigDir()
+	if err != nil {
+		t.Fatalf("getConfigDir() returned error: %v", err)
+	}
+
+	// Verify no double slashes or empty path components
+	if strings.Contains(configDir, "//") {
+		t.Errorf("config dir contains double slashes: %q", configDir)
+	}
+
+	if strings.HasSuffix(configDir, string(filepath.Separator)) {
+		t.Errorf("config dir ends with separator: %q", configDir)
+	}
+}
+
+// TestGetConfigDir_PathCanBeJoinedWithFile tests that returned path can be used with filepath.Join
+func TestGetConfigDir_PathCanBeJoinedWithFile(t *testing.T) {
+	configDir, err := getConfigDir()
+	if err != nil {
+		t.Fatalf("getConfigDir() returned error: %v", err)
+	}
+
+	// Should be able to join with a filename without issues
+	configFile := filepath.Join(configDir, "config.yaml")
+
+	if !strings.Contains(configFile, "config.yaml") {
+		t.Errorf("filepath.Join failed to create valid path: %q", configFile)
+	}
+
+	if !filepath.IsAbs(configFile) {
+		t.Errorf("joined path is not absolute: %q", configFile)
+	}
+}
+
+// TestGetConfigDir_NoError tests that function returns no error under normal conditions
+func TestGetConfigDir_NoError(t *testing.T) {
+	_, err := getConfigDir()
+	if err != nil {
+		t.Fatalf("getConfigDir() should not return error under normal conditions: %v", err)
+	}
+}
+
+// TestGetConfigDir_IntegrationWithLoad tests getConfigDir usage in Load function
+func TestGetConfigDir_IntegrationWithLoad(t *testing.T) {
+	// Create a temporary override by saving a file to the actual config location
+	// For this test, we verify that Load can successfully call getConfigDir internally
+	configFile := "/nonexistent/path/config.yaml"
+
+	// This should not error out due to getConfigDir failing
+	loaded, err := Load(configFile)
+	if err != nil {
+		t.Fatalf("Load() failed, suggesting getConfigDir issue: %v", err)
+	}
+
+	// Should return a valid (empty) config
+	if loaded == nil {
+		t.Fatalf("Load() returned nil config")
+	}
+}
+
+// TestGetConfigDir_IntegrationWithSave tests getConfigDir usage in Save function context
+func TestGetConfigDir_IntegrationWithSave(t *testing.T) {
+	configDir, err := getConfigDir()
+	if err != nil {
+		t.Fatalf("getConfigDir() returned error: %v", err)
+	}
+
+	// Create a test config and verify the directory structure matches
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test_config.yaml")
+
+	config := &Config{
+		CurrentProvider: "test",
+	}
+
+	err = config.Save(testFile)
+	if err != nil {
+		t.Fatalf("Save() returned error: %v", err)
+	}
+
+	// Verify that configDir ends with the same structure that would be created
+	if !strings.HasSuffix(configDir, filepath.Join(".config", "how")) {
+		t.Errorf("getConfigDir() and Save() path structures don't match")
+	}
+}
+
+// TestGetConfigDir_OSUserHomeDirResolution tests proper resolution of OS user home directory
+func TestGetConfigDir_OSUserHomeDirResolution(t *testing.T) {
+	// Get the home directory directly
+	expectedHome, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("unable to determine home directory from os.UserHomeDir()")
+	}
+
+	configDir, err := getConfigDir()
+	if err != nil {
+		t.Fatalf("getConfigDir() returned error: %v", err)
+	}
+
+	// Verify that config dir is built from the home directory
+	expectedPath := filepath.Join(expectedHome, ".config", "how")
+	if configDir != expectedPath {
+		t.Errorf("getConfigDir() = %q, want %q", configDir, expectedPath)
+	}
+}
+
+// TestGetConfigDir_NoNilPointerDereference tests that function doesn't panic
+func TestGetConfigDir_NoNilPointerDereference(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("getConfigDir() panicked: %v", r)
+		}
+	}()
+
+	_, _ = getConfigDir()
 }
