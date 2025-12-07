@@ -1,111 +1,149 @@
 project:
   name: How
   type: CLI Tool
-  description: AI Shell Assistant - intelligent terminal companion for commands, explanations,
-    and code generation
+  description: AI-powered shell assistant providing context-aware command help, code
+    generation, and explanations
   language: Go
   version: 1.0.0
+  repository: github.com/Codilas/how
 codebase_map:
   structure:
     cmd/:
-      purpose: Command-line interface entry points and command handlers
+      purpose: Command-line application entry point and root command handler
     internal/:
-      purpose: Private application logic, unexported packages
+      purpose: Private packages - CLI commands, configuration, context collection,
+        provider management
     pkg/:
-      purpose: Public reusable packages for external consumers
+      purpose: Public reusable packages - provider interfaces, text formatting, command
+        extraction
     scripts/:
-      purpose: Build, installation, and utility scripts
-  key_packages:
-  - name: CLI Commands
-    location: cmd/
-    purpose: Cobra-based command handlers for setup, query, config
-  - name: AI Integration
-    location: internal/
-    purpose: Provider abstraction for Claude, GPT-4, local models
-  - name: Context Engine
-    location: internal/
-    purpose: Shell context collection, directory awareness, command history
-  - name: Config Management
-    location: internal/
-    purpose: Viper-based configuration, provider credentials, user preferences
+      purpose: Installation and utility scripts
+  packages:
+    internal/cli:
+      purpose: Cobra-based command definitions (root, setup, history, install, providers)
+      key_files: root.go, setup.go, providers.go, history.go
+    internal/config:
+      purpose: Configuration loading/saving via Viper, YAML-based settings with environment
+        overrides
+      key_files: config.go
+    internal/context:
+      purpose: Shell context gathering - directory, environment, git info, command
+        history, project detection
+      key_files: context.go, git.go, history.go, project.go
+    internal/manager:
+      purpose: Provider lifecycle management - factory pattern for AI provider instantiation
+        and selection
+      key_files: manager.go, factory.go
+    pkg/providers:
+      purpose: Provider abstraction layer defining standard interface for all AI backends
+      key_files: interface.go, types.go, errors.go, anthropic/provider.go
+    pkg/extractor:
+      purpose: Command extraction and parsing from AI responses
+      key_files: command.go
+    pkg/text:
+      purpose: Terminal output formatting with syntax highlighting and structured
+        rendering
+      key_files: formatter.go
+    pkg/version:
+      purpose: Version metadata injected at build time
+      key_files: version.go
 tech_stack:
   language: Go 1.22.4
-  cli_framework: Cobra 1.9.1
-  config_management: Viper 1.20.1
-  ui_components:
-  - AlecAivazis/survey (interactive prompts)
-  - briandowns/spinner (loading indicators)
+  frameworks:
+  - Cobra 1.9.1 (CLI commands and flags)
+  - Viper 1.20.1 (configuration management)
+  ui_libraries:
+  - survey/v2 (interactive prompts)
+  - briandowns/spinner (loading animations)
   - fatih/color (terminal colors)
-  serialization: yaml.v3
-  build_system: Makefile
+  data_formats: YAML (gopkg.in/yaml.v3)
+  build_system: Makefile with cross-platform release support
 purpose:
-  goals:
-  - Provide context-aware AI assistance from terminal
-  - Support multiple AI providers (Claude, GPT-4, local)
-  - Enable command suggestions and explanations
-  - Generate code from natural language prompts
+  mission: Provide intelligent shell assistance with context awareness and multi-provider
+    AI support
   key_features:
-  - Multi-provider AI support with provider abstraction
-  - Shell context capture (directory, environment, history)
-  - Conversation memory for related queries
-  - Syntax-highlighted rich output formatting
-  - Interactive setup wizard for configuration
+  - Context-aware AI assistance (working directory, environment, git, command history)
+  - Multi-provider support (Anthropic Claude with pluggable architecture for others)
+  - Interactive setup wizard
+  - Command suggestion with safety warnings
+  - Syntax-highlighted formatted responses
+  - Streaming and non-streaming response modes
   architecture_patterns:
-  - Provider pattern for AI integration
-  - Configuration-driven multi-backend support
-  - Context collector pattern for environment awareness
-  - Command pattern via Cobra framework
+  - Provider abstraction (pluggable backend support)
+  - Manager pattern (provider lifecycle and selection)
+  - Configuration-driven multi-backend design
+  - Context collector pattern (composable environment awareness)
+  - Factory pattern (dynamic provider instantiation)
 development:
-  setup: make setup-dev
-  build: make build
-  test: make test
-  dev_run: ./bin/how "test prompt"
-  install_local: make install
-  key_commands:
-    setup: how setup
-    query: how "your question here"
-    explain: how explain kubernetes
-    generate: how write a bash script to backup MySQL
+  setup_dev_env: make setup-dev
+  essential_commands:
+    build: make build
+    dev_build: make dev (with race detection)
+    test: make test
+    test_race: make test-race
+    lint: make lint (requires golangci-lint)
+    format: make fmt
+    clean: make clean
+    deps: make deps (go mod tidy + download)
+  install_local: make install (installs to ~/.local/bin)
+  workflow:
+    1_setup: make setup-dev
+    2_edit: Edit code in cmd/, internal/, or pkg/
+    3_test: make test
+    4_build: make build
+    5_run: ./bin/how "your prompt"
+  version_info: Injected at build via LDFLAGS (version, git commit, build date)
 verification:
-  test: make test
-  build: make build
-  lint: golangci-lint run ./...
+  build_check: make build
+  test_check: make test
+  lint_check: make lint
+  race_detection: make test-race
+  multiplatform_release: make release (builds linux/darwin/windows)
+  quality_gates:
+    required:
+    - Build succeeds without errors
+    - All tests pass
+    optional:
+    - golangci-lint returns no errors
+    - Code formatted with go fmt
 conventions:
   naming:
-    packages: lowercase, single-word where possible
-    functions: camelCase, exported functions capitalized
-    files: snake_case.go for internal, descriptive names
+    packages: lowercase single-word (cli, config, manager)
+    functions: camelCase, PascalCase for exported functions
+    files: descriptive snake_case.go
   code_patterns:
-    config: Use Viper for all configuration management
-    cli: Use Cobra for command definitions
-    errors: Return errors explicitly, no panics in production code
-    logging: Use structured logging for debugging
-    context: Always capture and pass user shell context
-structure_notes:
-  entry_point: cmd/root.go or cmd/main.go
-  config_location: ~/.config/how/ or XDG_CONFIG_HOME
-  provider_abstraction: Supports pluggable AI backends
-  state_management: Config stored in YAML via Viper
+    config_management: Use Viper for all configuration loading/saving
+    cli_commands: Define via Cobra, organize in internal/cli
+    errors: Return errors explicitly, never panic in production
+    context: Always gather and pass shell context to AI provider
+    providers: Implement providers.Provider interface for new backends
+  directory_structure:
+    config: ~/.config/how/config.yaml (respects XDG_CONFIG_HOME)
+    installation: ~/.local/bin/how or /usr/local/bin/how
 detailed_guides:
 - path: .opsee/guides/ai-provider-integration.md
-  when: Adding new AI provider or modifying existing provider integration
+  when: Adding new AI provider or modifying provider architecture
 - path: .opsee/guides/context-collection.md
   when: Enhancing shell context capture or environment awareness
 - path: .opsee/guides/cli-commands.md
   when: Adding new commands or modifying command structure
 - path: .opsee/guides/build-deployment.md
-  when: Building releases or modifying build process
+  when: Building releases or modifying cross-platform build process
+critical_files:
+  cmd/how/main.go: Application entry point, calls cli.Execute()
+  internal/cli/root.go: Root command definition, prompt handling, provider initialization
+  internal/config/config.go: Config loading via Viper, environment variable support
+  internal/context/context.go: Context gathering orchestration
+  internal/manager/manager.go: Provider lifecycle, selection, scoring
+  pkg/providers/interface.go: Standard Provider interface all backends must implement
+  pkg/providers/anthropic/provider.go: Claude API implementation
 git:
   main_branch: main
-  workflow: Feature branches merged to main via PR
-  recent_commits:
-  - 6583cec Fix scripts directory
-  - 9f6ea13 Update github path
-  - 4cd77bd Initial commit
-quality_gates:
-  required_checks:
-  - build succeeds
-  - tests pass
-  optional_checks:
-  - golangci-lint clean
-  - documentation updated
+  workflow: Feature branches, PR merge to main
+  quality_checks:
+    required:
+    - Build passes
+    - Tests pass
+    optional:
+    - Code lint clean
+    - Documentation updated
