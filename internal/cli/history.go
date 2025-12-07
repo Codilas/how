@@ -58,14 +58,20 @@ func runHistoryWithWriter(stdout, stderr io.Writer, getHistoryFileFn func() stri
 }
 
 func runClearHistory(cmd *cobra.Command, args []string) {
-	historyFile := getHistoryFile()
+	runClearHistoryWithWriter(os.Stdout, os.Stderr, getHistoryFile)
+}
+
+// runClearHistoryWithWriter is the testable implementation of runClearHistory.
+// It accepts output writers and a function to get the history file path.
+func runClearHistoryWithWriter(stdout, stderr io.Writer, getHistoryFileFn func() string) {
+	historyFile := getHistoryFileFn()
 
 	if err := os.Remove(historyFile); err != nil && !os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Error clearing history: %v\n", err)
+		fmt.Fprintf(stderr, "Error clearing history: %v\n", err)
 		return
 	}
 
-	fmt.Println("🗑️ Conversation history cleared.")
+	fmt.Fprintln(stdout, "🗑️ Conversation history cleared.")
 }
 
 func getHistoryFile() string {
