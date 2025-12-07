@@ -83,6 +83,26 @@ make dev
 ./bin/how "test prompt"
 ```
 
+### Testing
+
+The project includes comprehensive test coverage for configuration management:
+
+```bash
+# Run all tests
+make test
+
+# Run tests with race detection
+make test-race
+
+# Run tests with coverage report
+make test-coverage
+
+# Generate HTML coverage report
+make test-coverage-html
+```
+
+For detailed testing documentation, see [TESTING.md](./TESTING.md).
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file.
