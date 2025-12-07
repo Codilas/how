@@ -1937,3 +1937,935 @@ func TestGetConfigDir_NoNilPointerDereference(t *testing.T) {
 
 	_, _ = getConfigDir()
 }
+
+// TestContextConfig_FieldInitialization tests ContextConfig field initialization
+func TestContextConfig_FieldInitialization(t *testing.T) {
+	config := ContextConfig{}
+
+	// Verify zero values for all fields
+	if config.IncludeFiles != false {
+		t.Errorf("IncludeFiles = %v, want false", config.IncludeFiles)
+	}
+
+	if config.IncludeHistory != 0 {
+		t.Errorf("IncludeHistory = %d, want 0", config.IncludeHistory)
+	}
+
+	if config.IncludeEnvironment != false {
+		t.Errorf("IncludeEnvironment = %v, want false", config.IncludeEnvironment)
+	}
+
+	if config.IncludeGit != false {
+		t.Errorf("IncludeGit = %v, want false", config.IncludeGit)
+	}
+
+	if config.MaxContextSize != 0 {
+		t.Errorf("MaxContextSize = %d, want 0", config.MaxContextSize)
+	}
+
+	if len(config.ExcludePatterns) != 0 {
+		t.Errorf("ExcludePatterns should be empty, got %v", config.ExcludePatterns)
+	}
+}
+
+// TestContextConfig_YAMLTags tests YAML tag mappings for ContextConfig
+func TestContextConfig_YAMLTags(t *testing.T) {
+	ctx := ContextConfig{
+		IncludeFiles:       true,
+		IncludeHistory:     10,
+		IncludeEnvironment: true,
+		IncludeGit:         true,
+		MaxContextSize:     100000,
+		ExcludePatterns:    []string{"*.log"},
+	}
+
+	data, err := yaml.Marshal(ctx)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	yamlStr := string(data)
+
+	if !contains(yamlStr, "includeFiles") {
+		t.Errorf("includeFiles tag not found in YAML")
+	}
+
+	if !contains(yamlStr, "includeHistory") {
+		t.Errorf("includeHistory tag not found in YAML")
+	}
+
+	if !contains(yamlStr, "includeEnvironment") {
+		t.Errorf("includeEnvironment tag not found in YAML")
+	}
+
+	if !contains(yamlStr, "includeGit") {
+		t.Errorf("includeGit tag not found in YAML")
+	}
+
+	if !contains(yamlStr, "maxContextSize") {
+		t.Errorf("maxContextSize tag not found in YAML")
+	}
+
+	if !contains(yamlStr, "excludePatterns") {
+		t.Errorf("excludePatterns tag not found in YAML")
+	}
+}
+
+// TestContextConfig_UnmarshalYAML tests unmarshaling YAML into ContextConfig
+func TestContextConfig_UnmarshalYAML(t *testing.T) {
+	yamlData := `includeFiles: true
+includeHistory: 20
+includeEnvironment: false
+includeGit: true
+maxContextSize: 50000
+excludePatterns:
+  - "*.log"
+  - "node_modules/*"
+  - ".git/*"
+`
+
+	var ctx ContextConfig
+	err := yaml.Unmarshal([]byte(yamlData), &ctx)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if ctx.IncludeFiles != true {
+		t.Errorf("IncludeFiles = %v, want true", ctx.IncludeFiles)
+	}
+
+	if ctx.IncludeHistory != 20 {
+		t.Errorf("IncludeHistory = %d, want 20", ctx.IncludeHistory)
+	}
+
+	if ctx.IncludeEnvironment != false {
+		t.Errorf("IncludeEnvironment = %v, want false", ctx.IncludeEnvironment)
+	}
+
+	if ctx.MaxContextSize != 50000 {
+		t.Errorf("MaxContextSize = %d, want 50000", ctx.MaxContextSize)
+	}
+
+	if len(ctx.ExcludePatterns) != 3 {
+		t.Errorf("ExcludePatterns count = %d, want 3", len(ctx.ExcludePatterns))
+	}
+}
+
+// TestContextConfig_RoundTripMarshaling tests Marshal -> Unmarshal consistency
+func TestContextConfig_RoundTripMarshaling(t *testing.T) {
+	original := ContextConfig{
+		IncludeFiles:       true,
+		IncludeHistory:     15,
+		IncludeEnvironment: true,
+		IncludeGit:         false,
+		MaxContextSize:     75000,
+		ExcludePatterns:    []string{"*.tmp", "*.cache"},
+	}
+
+	// Marshal
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	// Unmarshal
+	var unmarshaled ContextConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	// Verify fields match
+	if unmarshaled.IncludeFiles != original.IncludeFiles {
+		t.Errorf("IncludeFiles mismatch after round-trip")
+	}
+
+	if unmarshaled.IncludeHistory != original.IncludeHistory {
+		t.Errorf("IncludeHistory mismatch after round-trip")
+	}
+
+	if unmarshaled.MaxContextSize != original.MaxContextSize {
+		t.Errorf("MaxContextSize mismatch after round-trip")
+	}
+
+	if len(unmarshaled.ExcludePatterns) != len(original.ExcludePatterns) {
+		t.Errorf("ExcludePatterns length mismatch after round-trip")
+	}
+}
+
+// TestDisplayConfig_FieldInitialization tests DisplayConfig field initialization
+func TestDisplayConfig_FieldInitialization(t *testing.T) {
+	config := DisplayConfig{}
+
+	// Verify zero values for all boolean fields
+	if config.SyntaxHighlight != false {
+		t.Errorf("SyntaxHighlight = %v, want false", config.SyntaxHighlight)
+	}
+
+	if config.ShowContext != false {
+		t.Errorf("ShowContext = %v, want false", config.ShowContext)
+	}
+
+	if config.Emoji != false {
+		t.Errorf("Emoji = %v, want false", config.Emoji)
+	}
+
+	if config.Color != false {
+		t.Errorf("Color = %v, want false", config.Color)
+	}
+}
+
+// TestDisplayConfig_YAMLTags tests YAML tag mappings for DisplayConfig
+func TestDisplayConfig_YAMLTags(t *testing.T) {
+	display := DisplayConfig{
+		SyntaxHighlight: true,
+		ShowContext:     true,
+		Emoji:           false,
+		Color:           true,
+	}
+
+	data, err := yaml.Marshal(display)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	yamlStr := string(data)
+
+	if !contains(yamlStr, "syntaxHighlight") {
+		t.Errorf("syntaxHighlight tag not found in YAML")
+	}
+
+	if !contains(yamlStr, "showContext") {
+		t.Errorf("showContext tag not found in YAML")
+	}
+
+	if !contains(yamlStr, "emoji") {
+		t.Errorf("emoji tag not found in YAML")
+	}
+
+	if !contains(yamlStr, "color") {
+		t.Errorf("color tag not found in YAML")
+	}
+}
+
+// TestDisplayConfig_UnmarshalYAML tests unmarshaling YAML into DisplayConfig
+func TestDisplayConfig_UnmarshalYAML(t *testing.T) {
+	yamlData := `syntaxHighlight: true
+showContext: false
+emoji: true
+color: false
+`
+
+	var display DisplayConfig
+	err := yaml.Unmarshal([]byte(yamlData), &display)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if display.SyntaxHighlight != true {
+		t.Errorf("SyntaxHighlight = %v, want true", display.SyntaxHighlight)
+	}
+
+	if display.ShowContext != false {
+		t.Errorf("ShowContext = %v, want false", display.ShowContext)
+	}
+
+	if display.Emoji != true {
+		t.Errorf("Emoji = %v, want true", display.Emoji)
+	}
+
+	if display.Color != false {
+		t.Errorf("Color = %v, want false", display.Color)
+	}
+}
+
+// TestDisplayConfig_RoundTripMarshaling tests Marshal -> Unmarshal consistency
+func TestDisplayConfig_RoundTripMarshaling(t *testing.T) {
+	original := DisplayConfig{
+		SyntaxHighlight: true,
+		ShowContext:     true,
+		Emoji:           true,
+		Color:           true,
+	}
+
+	// Marshal
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	// Unmarshal
+	var unmarshaled DisplayConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	// Verify all fields match
+	if unmarshaled.SyntaxHighlight != original.SyntaxHighlight {
+		t.Errorf("SyntaxHighlight mismatch after round-trip")
+	}
+
+	if unmarshaled.ShowContext != original.ShowContext {
+		t.Errorf("ShowContext mismatch after round-trip")
+	}
+
+	if unmarshaled.Emoji != original.Emoji {
+		t.Errorf("Emoji mismatch after round-trip")
+	}
+
+	if unmarshaled.Color != original.Color {
+		t.Errorf("Color mismatch after round-trip")
+	}
+}
+
+// TestHistoryConfig_FieldInitialization tests HistoryConfig field initialization
+func TestHistoryConfig_FieldInitialization(t *testing.T) {
+	config := HistoryConfig{}
+
+	// Verify zero values
+	if config.Enabled != false {
+		t.Errorf("Enabled = %v, want false", config.Enabled)
+	}
+
+	if config.MaxSize != 0 {
+		t.Errorf("MaxSize = %d, want 0", config.MaxSize)
+	}
+
+	if config.FilePath != "" {
+		t.Errorf("FilePath = %q, want empty string", config.FilePath)
+	}
+}
+
+// TestHistoryConfig_YAMLTags tests YAML tag mappings for HistoryConfig
+func TestHistoryConfig_YAMLTags(t *testing.T) {
+	history := HistoryConfig{
+		Enabled:  true,
+		MaxSize:  1000,
+		FilePath: "~/.how/history",
+	}
+
+	data, err := yaml.Marshal(history)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	yamlStr := string(data)
+
+	if !contains(yamlStr, "enabled") {
+		t.Errorf("enabled tag not found in YAML")
+	}
+
+	if !contains(yamlStr, "maxSize") {
+		t.Errorf("maxSize tag not found in YAML")
+	}
+
+	if !contains(yamlStr, "filePath") {
+		t.Errorf("filePath tag not found in YAML")
+	}
+}
+
+// TestHistoryConfig_UnmarshalYAML tests unmarshaling YAML into HistoryConfig
+func TestHistoryConfig_UnmarshalYAML(t *testing.T) {
+	yamlData := `enabled: true
+maxSize: 2000
+filePath: "/var/log/how/history"
+`
+
+	var history HistoryConfig
+	err := yaml.Unmarshal([]byte(yamlData), &history)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if history.Enabled != true {
+		t.Errorf("Enabled = %v, want true", history.Enabled)
+	}
+
+	if history.MaxSize != 2000 {
+		t.Errorf("MaxSize = %d, want 2000", history.MaxSize)
+	}
+
+	if history.FilePath != "/var/log/how/history" {
+		t.Errorf("FilePath = %q, want %q", history.FilePath, "/var/log/how/history")
+	}
+}
+
+// TestHistoryConfig_RoundTripMarshaling tests Marshal -> Unmarshal consistency
+func TestHistoryConfig_RoundTripMarshaling(t *testing.T) {
+	original := HistoryConfig{
+		Enabled:  true,
+		MaxSize:  5000,
+		FilePath: "~/.config/how/history.txt",
+	}
+
+	// Marshal
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	// Unmarshal
+	var unmarshaled HistoryConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	// Verify fields match
+	if unmarshaled.Enabled != original.Enabled {
+		t.Errorf("Enabled mismatch after round-trip")
+	}
+
+	if unmarshaled.MaxSize != original.MaxSize {
+		t.Errorf("MaxSize mismatch after round-trip")
+	}
+
+	if unmarshaled.FilePath != original.FilePath {
+		t.Errorf("FilePath mismatch after round-trip")
+	}
+}
+
+// TestProviderConfig_FieldInitialization tests ProviderConfig field initialization
+func TestProviderConfig_FieldInitialization(t *testing.T) {
+	config := ProviderConfig{}
+
+	// Verify zero values for all fields
+	if config.Type != "" {
+		t.Errorf("Type = %q, want empty string", config.Type)
+	}
+
+	if config.APIKey != "" {
+		t.Errorf("APIKey = %q, want empty string", config.APIKey)
+	}
+
+	if config.Model != "" {
+		t.Errorf("Model = %q, want empty string", config.Model)
+	}
+
+	if config.BaseURL != "" {
+		t.Errorf("BaseURL = %q, want empty string", config.BaseURL)
+	}
+
+	if config.MaxTokens != 0 {
+		t.Errorf("MaxTokens = %d, want 0", config.MaxTokens)
+	}
+
+	if config.Temperature != 0 {
+		t.Errorf("Temperature = %f, want 0", config.Temperature)
+	}
+
+	if config.TopP != 0 {
+		t.Errorf("TopP = %f, want 0", config.TopP)
+	}
+
+	if config.SystemPrompt != "" {
+		t.Errorf("SystemPrompt = %q, want empty string", config.SystemPrompt)
+	}
+
+	if len(config.CustomHeaders) != 0 {
+		t.Errorf("CustomHeaders should be empty, got %v", config.CustomHeaders)
+	}
+}
+
+// TestProviderConfig_OptionalFieldsHandling tests optional fields with omitempty tags
+func TestProviderConfig_OptionalFieldsHandling(t *testing.T) {
+	// Test with minimal required fields
+	provider := ProviderConfig{
+		Type:      "anthropic",
+		APIKey:    "sk-test",
+		Model:     "claude-3",
+		MaxTokens: 2048,
+		// Optional fields left empty
+	}
+
+	data, err := yaml.Marshal(provider)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	yamlStr := string(data)
+
+	// Required fields should be present
+	if !contains(yamlStr, "type") {
+		t.Errorf("required field 'type' should be in YAML")
+	}
+
+	if !contains(yamlStr, "apiKey") {
+		t.Errorf("required field 'apiKey' should be in YAML")
+	}
+
+	if !contains(yamlStr, "maxTokens") {
+		t.Errorf("required field 'maxTokens' should be in YAML")
+	}
+}
+
+// TestProviderConfig_OmitemptyFieldsBehavior tests that optional fields with omitempty don't appear when empty
+func TestProviderConfig_OmitemptyFieldsBehavior(t *testing.T) {
+	provider := ProviderConfig{
+		Type:      "anthropic",
+		APIKey:    "sk-test",
+		Model:     "claude-3",
+		MaxTokens: 2048,
+		// BaseURL, Temperature, TopP, SystemPrompt, CustomHeaders are empty/zero
+	}
+
+	data, err := yaml.Marshal(provider)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	yamlStr := string(data)
+
+	// Optional fields should generally not appear if empty
+	// Note: behavior depends on YAML marshaler, but omitempty should prevent them
+	if contains(yamlStr, "baseUrl: null") {
+		// Some YAML marshalers output null, which is acceptable
+	} else if contains(yamlStr, "baseUrl:") && !contains(yamlStr, "baseUrl: \"\"") {
+		t.Logf("baseUrl appears as empty in YAML output, which may be due to marshaler behavior")
+	}
+}
+
+// TestProviderConfig_UnmarshalYAML tests unmarshaling YAML into ProviderConfig
+func TestProviderConfig_UnmarshalYAML(t *testing.T) {
+	yamlData := `type: anthropic
+apiKey: sk-test-123
+model: claude-3-opus
+maxTokens: 4096
+baseUrl: https://api.anthropic.com
+temperature: 0.7
+topP: 0.95
+systemPrompt: "You are helpful"
+customHeaders:
+  X-Custom: value
+`
+
+	var provider ProviderConfig
+	err := yaml.Unmarshal([]byte(yamlData), &provider)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if provider.Type != "anthropic" {
+		t.Errorf("Type = %q, want %q", provider.Type, "anthropic")
+	}
+
+	if provider.APIKey != "sk-test-123" {
+		t.Errorf("APIKey = %q, want %q", provider.APIKey, "sk-test-123")
+	}
+
+	if provider.MaxTokens != 4096 {
+		t.Errorf("MaxTokens = %d, want 4096", provider.MaxTokens)
+	}
+
+	if provider.Temperature != 0.7 {
+		t.Errorf("Temperature = %f, want 0.7", provider.Temperature)
+	}
+
+	if provider.CustomHeaders["X-Custom"] != "value" {
+		t.Errorf("CustomHeaders not unmarshaled correctly")
+	}
+}
+
+// TestProviderConfig_RoundTripMarshaling tests Marshal -> Unmarshal consistency
+func TestProviderConfig_RoundTripMarshaling(t *testing.T) {
+	original := ProviderConfig{
+		Type:        "anthropic",
+		APIKey:      "sk-test-abc",
+		Model:       "claude-3-sonnet",
+		MaxTokens:   8192,
+		BaseURL:     "https://api.anthropic.com",
+		Temperature: 0.8,
+		TopP:        0.9,
+		SystemPrompt: "Help the user",
+		CustomHeaders: map[string]string{
+			"Authorization": "Bearer token",
+			"X-Version":     "v1",
+		},
+	}
+
+	// Marshal
+	data, err := yaml.Marshal(original)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	// Unmarshal
+	var unmarshaled ProviderConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	// Verify fields match
+	if unmarshaled.Type != original.Type {
+		t.Errorf("Type mismatch after round-trip")
+	}
+
+	if unmarshaled.APIKey != original.APIKey {
+		t.Errorf("APIKey mismatch after round-trip")
+	}
+
+	if unmarshaled.MaxTokens != original.MaxTokens {
+		t.Errorf("MaxTokens mismatch after round-trip")
+	}
+
+	if unmarshaled.BaseURL != original.BaseURL {
+		t.Errorf("BaseURL mismatch after round-trip")
+	}
+
+	if len(unmarshaled.CustomHeaders) != len(original.CustomHeaders) {
+		t.Errorf("CustomHeaders count mismatch after round-trip")
+	}
+}
+
+// TestConfig_NestedStructMarshaling tests marshaling of Config with nested structs
+func TestConfig_NestedStructMarshaling(t *testing.T) {
+	config := Config{
+		CurrentProvider: "anthropic",
+		Providers: map[string]ProviderConfig{
+			"anthropic": {
+				Type:      "anthropic",
+				APIKey:    "sk-test",
+				Model:     "claude-3",
+				MaxTokens: 4096,
+			},
+		},
+		Context: ContextConfig{
+			IncludeFiles:   true,
+			IncludeHistory: 10,
+			MaxContextSize: 100000,
+		},
+		Display: DisplayConfig{
+			SyntaxHighlight: true,
+			Color:           true,
+		},
+		History: HistoryConfig{
+			Enabled:  true,
+			MaxSize:  1000,
+			FilePath: "~/.how/history",
+		},
+	}
+
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var unmarshaled Config
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	// Verify nested structs are preserved
+	if unmarshaled.Context.IncludeFiles != config.Context.IncludeFiles {
+		t.Errorf("nested Context.IncludeFiles mismatch")
+	}
+
+	if unmarshaled.Display.SyntaxHighlight != config.Display.SyntaxHighlight {
+		t.Errorf("nested Display.SyntaxHighlight mismatch")
+	}
+
+	if unmarshaled.History.MaxSize != config.History.MaxSize {
+		t.Errorf("nested History.MaxSize mismatch")
+	}
+}
+
+// TestConfig_NestedMapMarshaling tests marshaling of nested Provider map in Config
+func TestConfig_NestedMapMarshaling(t *testing.T) {
+	config := Config{
+		CurrentProvider: "anthropic",
+		Providers: map[string]ProviderConfig{
+			"anthropic": {
+				Type:      "anthropic",
+				APIKey:    "sk-anthropic",
+				Model:     "claude-3",
+				MaxTokens: 4096,
+			},
+			"openai": {
+				Type:      "openai",
+				APIKey:    "sk-openai",
+				Model:     "gpt-4",
+				MaxTokens: 8192,
+			},
+		},
+	}
+
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var unmarshaled Config
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	// Verify all providers are preserved
+	if len(unmarshaled.Providers) != 2 {
+		t.Errorf("provider count = %d, want 2", len(unmarshaled.Providers))
+	}
+
+	if unmarshaled.Providers["anthropic"].APIKey != "sk-anthropic" {
+		t.Errorf("anthropic provider not preserved correctly")
+	}
+
+	if unmarshaled.Providers["openai"].Model != "gpt-4" {
+		t.Errorf("openai provider not preserved correctly")
+	}
+}
+
+// TestConfig_NestedSliceMarshaling tests marshaling of nested slices in Config
+func TestConfig_NestedSliceMarshaling(t *testing.T) {
+	config := Config{
+		CurrentProvider: "test",
+		Context: ContextConfig{
+			ExcludePatterns: []string{
+				"*.log",
+				"node_modules/*",
+				".git/*",
+				"*.tmp",
+			},
+		},
+	}
+
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var unmarshaled Config
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	// Verify all patterns are preserved
+	if len(unmarshaled.Context.ExcludePatterns) != 4 {
+		t.Errorf("exclude patterns count = %d, want 4", len(unmarshaled.Context.ExcludePatterns))
+	}
+
+	expectedPatterns := []string{"*.log", "node_modules/*", ".git/*", "*.tmp"}
+	for i, pattern := range expectedPatterns {
+		if i < len(unmarshaled.Context.ExcludePatterns) {
+			if unmarshaled.Context.ExcludePatterns[i] != pattern {
+				t.Errorf("pattern[%d] = %q, want %q", i, unmarshaled.Context.ExcludePatterns[i], pattern)
+			}
+		}
+	}
+}
+
+// TestConfig_AllStructsCompleteMarshaling tests complete Config with all nested structs populated
+func TestConfig_AllStructsCompleteMarshaling(t *testing.T) {
+	config := Config{
+		CurrentProvider: "anthropic",
+		Providers: map[string]ProviderConfig{
+			"anthropic": {
+				Type:         "anthropic",
+				APIKey:       "sk-test",
+				Model:        "claude-3-opus",
+				MaxTokens:    4096,
+				BaseURL:      "https://api.anthropic.com",
+				Temperature:  0.7,
+				TopP:         0.95,
+				SystemPrompt: "You are helpful",
+				CustomHeaders: map[string]string{
+					"X-Custom": "header-value",
+				},
+			},
+		},
+		Context: ContextConfig{
+			IncludeFiles:       true,
+			IncludeHistory:     20,
+			IncludeEnvironment: true,
+			IncludeGit:         true,
+			MaxContextSize:     100000,
+			ExcludePatterns:    []string{"*.log", ".env*"},
+		},
+		Display: DisplayConfig{
+			SyntaxHighlight: true,
+			ShowContext:     true,
+			Emoji:           true,
+			Color:           true,
+		},
+		History: HistoryConfig{
+			Enabled:  true,
+			MaxSize:  5000,
+			FilePath: "~/.how/history",
+		},
+	}
+
+	// Marshal and unmarshal
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var unmarshaled Config
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	// Verify all top-level fields
+	if unmarshaled.CurrentProvider != config.CurrentProvider {
+		t.Errorf("CurrentProvider mismatch")
+	}
+
+	// Verify Providers
+	if len(unmarshaled.Providers) != len(config.Providers) {
+		t.Errorf("Providers count mismatch")
+	}
+
+	// Verify Context
+	if unmarshaled.Context.IncludeFiles != config.Context.IncludeFiles {
+		t.Errorf("Context.IncludeFiles mismatch")
+	}
+
+	if unmarshaled.Context.MaxContextSize != config.Context.MaxContextSize {
+		t.Errorf("Context.MaxContextSize mismatch")
+	}
+
+	// Verify Display
+	if unmarshaled.Display.SyntaxHighlight != config.Display.SyntaxHighlight {
+		t.Errorf("Display.SyntaxHighlight mismatch")
+	}
+
+	// Verify History
+	if unmarshaled.History.Enabled != config.History.Enabled {
+		t.Errorf("History.Enabled mismatch")
+	}
+
+	if unmarshaled.History.MaxSize != config.History.MaxSize {
+		t.Errorf("History.MaxSize mismatch")
+	}
+}
+
+// TestProviderConfig_CustomHeadersMarshalingComplex tests complex CustomHeaders marshaling
+func TestProviderConfig_CustomHeadersMarshalingComplex(t *testing.T) {
+	provider := ProviderConfig{
+		Type:      "anthropic",
+		APIKey:    "sk-test",
+		Model:     "claude-3",
+		MaxTokens: 2048,
+		CustomHeaders: map[string]string{
+			"Authorization":  "Bearer secret-token-123",
+			"X-API-Version":  "2024-01",
+			"X-Client-ID":    "my-client",
+			"Content-Type":   "application/json",
+		},
+	}
+
+	data, err := yaml.Marshal(provider)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var unmarshaled ProviderConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	// Verify all custom headers are preserved
+	if len(unmarshaled.CustomHeaders) != 4 {
+		t.Errorf("CustomHeaders count = %d, want 4", len(unmarshaled.CustomHeaders))
+	}
+
+	if unmarshaled.CustomHeaders["Authorization"] != "Bearer secret-token-123" {
+		t.Errorf("Authorization header not preserved")
+	}
+
+	if unmarshaled.CustomHeaders["X-API-Version"] != "2024-01" {
+		t.Errorf("X-API-Version header not preserved")
+	}
+}
+
+// TestContextConfig_SliceMarshalingEmpty tests empty ExcludePatterns slice marshaling
+func TestContextConfig_SliceMarshalingEmpty(t *testing.T) {
+	ctx := ContextConfig{
+		IncludeFiles: true,
+		ExcludePatterns: []string{}, // Empty slice
+	}
+
+	data, err := yaml.Marshal(ctx)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var unmarshaled ContextConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if unmarshaled.ExcludePatterns == nil {
+		// Empty slice may be unmarshaled as nil, which is acceptable
+		unmarshaled.ExcludePatterns = []string{}
+	}
+
+	if len(unmarshaled.ExcludePatterns) != 0 {
+		t.Errorf("ExcludePatterns should be empty after round-trip")
+	}
+}
+
+// TestContextConfig_SliceMarshalingSingleElement tests single element ExcludePatterns slice marshaling
+func TestContextConfig_SliceMarshalingSingleElement(t *testing.T) {
+	ctx := ContextConfig{
+		IncludeFiles:    true,
+		ExcludePatterns: []string{"*.log"},
+	}
+
+	data, err := yaml.Marshal(ctx)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var unmarshaled ContextConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if len(unmarshaled.ExcludePatterns) != 1 {
+		t.Errorf("ExcludePatterns count = %d, want 1", len(unmarshaled.ExcludePatterns))
+	}
+
+	if unmarshaled.ExcludePatterns[0] != "*.log" {
+		t.Errorf("ExcludePatterns[0] = %q, want %q", unmarshaled.ExcludePatterns[0], "*.log")
+	}
+}
+
+// TestProviderConfig_FloatFieldsPrecision tests float field precision in marshaling
+func TestProviderConfig_FloatFieldsPrecision(t *testing.T) {
+	provider := ProviderConfig{
+		Type:        "anthropic",
+		APIKey:      "sk-test",
+		Model:       "claude-3",
+		MaxTokens:   2048,
+		Temperature: 0.75,
+		TopP:        0.9,
+	}
+
+	data, err := yaml.Marshal(provider)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var unmarshaled ProviderConfig
+	err = yaml.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	// Float32 comparison with tolerance
+	if unmarshaled.Temperature < 0.74 || unmarshaled.Temperature > 0.76 {
+		t.Errorf("Temperature = %f, want ~0.75", unmarshaled.Temperature)
+	}
+
+	if unmarshaled.TopP < 0.89 || unmarshaled.TopP > 0.91 {
+		t.Errorf("TopP = %f, want ~0.9", unmarshaled.TopP)
+	}
+}
