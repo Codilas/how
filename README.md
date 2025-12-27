@@ -7,7 +7,9 @@ An intelligent shell assistant that helps you with commands, explanations, and c
 ```bash
 # Clone and build
 git clone https://github.com/Codilas/how.git
+
 cd how
+
 make install
 
 # Setup (configure AI provider)
