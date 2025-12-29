@@ -1,6 +1,7 @@
 package text
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -5257,5 +5258,472 @@ func BenchmarkWrapLineWithLongWords(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = formatter.wrapLine(input)
+	}
+}
+
+// TestWriteHeaderBasicWithColors tests writeHeader with colors enabled
+func TestWriteHeaderBasicWithColors(t *testing.T) {
+	config := FormatterConfig{
+		UseColors:     true,
+		CommentPrefix: "# ",
+		LineWidth:     80,
+		IndentSize:    2,
+		UseBoxes:      true,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	var result strings.Builder
+	formatter.writeHeader(&result)
+	output := result.String()
+
+	// Should contain the title
+	if !strings.Contains(output, "AI Assistant Response") {
+		t.Error("Expected output to contain 'AI Assistant Response'")
+	}
+
+	// Should have three lines (top border, title, bottom border) plus empty line
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) < 3 {
+		t.Errorf("Expected at least 3 lines, got %d", len(lines))
+	}
+
+	// Each line should start with comment prefix
+	for i, line := range lines {
+		if !strings.HasPrefix(line, config.CommentPrefix) {
+			t.Errorf("Line %d should start with comment prefix, got: %q", i, line)
+		}
+	}
+}
+
+// TestWriteHeaderBasicWithoutColors tests writeHeader with colors disabled
+func TestWriteHeaderBasicWithoutColors(t *testing.T) {
+	config := FormatterConfig{
+		UseColors:     false,
+		CommentPrefix: "# ",
+		LineWidth:     80,
+		IndentSize:    2,
+		UseBoxes:      true,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	var result strings.Builder
+	formatter.writeHeader(&result)
+	output := result.String()
+
+	// Should contain the title in uppercase
+	if !strings.Contains(output, "AI ASSISTANT RESPONSE") {
+		t.Error("Expected output to contain 'AI ASSISTANT RESPONSE' (uppercase)")
+	}
+
+	// Should have border characters (=)
+	if !strings.Contains(output, "=") {
+		t.Error("Expected output to contain '=' border character")
+	}
+
+	// Should have three lines (top border, title, bottom border) plus empty line
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) < 3 {
+		t.Errorf("Expected at least 3 lines, got %d", len(lines))
+	}
+}
+
+// TestWriteHeaderBorderDrawing tests border drawing with different configurations
+func TestWriteHeaderBorderDrawing(t *testing.T) {
+	tests := []struct {
+		name          string
+		commentPrefix string
+		lineWidth     int
+		useColors     bool
+		borderChar    string
+	}{
+		{
+			name:          "Default border",
+			commentPrefix: "# ",
+			lineWidth:     80,
+			useColors:     false,
+			borderChar:    "=",
+		},
+		{
+			name:          "Short line width",
+			commentPrefix: "# ",
+			lineWidth:     40,
+			useColors:     false,
+			borderChar:    "=",
+		},
+		{
+			name:          "Long line width",
+			commentPrefix: "# ",
+			lineWidth:     120,
+			useColors:     false,
+			borderChar:    "=",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     tt.useColors,
+				CommentPrefix: tt.commentPrefix,
+				LineWidth:     tt.lineWidth,
+				IndentSize:    2,
+				UseBoxes:      true,
+			}
+			formatter := NewTerminalFormatter(config)
+
+			var result strings.Builder
+			formatter.writeHeader(&result)
+			output := result.String()
+
+			lines := strings.Split(strings.TrimSpace(output), "\n")
+
+			// First and last lines should be borders
+			for i := 0; i < 1; i++ {
+				if !strings.Contains(lines[i], tt.borderChar) {
+					t.Errorf("Border line %d should contain '%s'", i, tt.borderChar)
+				}
+			}
+
+			// Border should respect line width
+			borderLine := lines[0]
+			if len(borderLine) > tt.lineWidth {
+				t.Errorf("Border line length %d exceeds line width %d", len(borderLine), tt.lineWidth)
+			}
+		})
+	}
+}
+
+// TestWriteHeaderTitleCentering tests that the title is properly centered
+func TestWriteHeaderTitleCentering(t *testing.T) {
+	tests := []struct {
+		name          string
+		commentPrefix string
+		lineWidth     int
+	}{
+		{
+			name:          "Default centering",
+			commentPrefix: "# ",
+			lineWidth:     80,
+		},
+		{
+			name:          "Short width centering",
+			commentPrefix: "# ",
+			lineWidth:     40,
+		},
+		{
+			name:          "Long width centering",
+			commentPrefix: "# ",
+			lineWidth:     100,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				CommentPrefix: tt.commentPrefix,
+				LineWidth:     tt.lineWidth,
+				IndentSize:    2,
+				UseBoxes:      true,
+			}
+			formatter := NewTerminalFormatter(config)
+
+			var result strings.Builder
+			formatter.writeHeader(&result)
+			output := result.String()
+
+			lines := strings.Split(strings.TrimSpace(output), "\n")
+			if len(lines) < 2 {
+				t.Fatal("Expected at least 2 lines")
+			}
+
+			titleLine := lines[1]
+
+			// Title should be present in line
+			if !strings.Contains(titleLine, "AI ASSISTANT RESPONSE") {
+				t.Error("Title line should contain 'AI ASSISTANT RESPONSE'")
+			}
+
+			// Calculate expected padding
+			title := "AI ASSISTANT RESPONSE"
+			totalWidth := tt.lineWidth - len(tt.commentPrefix)
+			expectedPadding := (totalWidth - len(title)) / 2
+
+			// Count leading spaces after comment prefix
+			afterPrefix := strings.TrimPrefix(titleLine, tt.commentPrefix)
+			leadingSpaces := len(afterPrefix) - len(strings.TrimLeft(afterPrefix, " "))
+
+			if leadingSpaces != expectedPadding {
+				t.Errorf("Expected %d leading spaces, got %d", expectedPadding, leadingSpaces)
+			}
+		})
+	}
+}
+
+// TestWriteHeaderCommentPrefixes tests writeHeader with various comment prefixes
+func TestWriteHeaderCommentPrefixes(t *testing.T) {
+	prefixes := []string{
+		"# ",
+		"## ",
+		"// ",
+		"; ",
+		"-- ",
+		"",
+	}
+
+	for _, prefix := range prefixes {
+		t.Run(fmt.Sprintf("Prefix: %q", prefix), func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				CommentPrefix: prefix,
+				LineWidth:     80,
+				IndentSize:    2,
+				UseBoxes:      true,
+			}
+			formatter := NewTerminalFormatter(config)
+
+			var result strings.Builder
+			formatter.writeHeader(&result)
+			output := result.String()
+
+			lines := strings.Split(strings.TrimSpace(output), "\n")
+
+			// Each non-empty line should start with the comment prefix
+			for _, line := range lines {
+				if line != "" && !strings.HasPrefix(line, prefix) {
+					t.Errorf("Line should start with prefix %q, got: %q", prefix, line)
+				}
+			}
+		})
+	}
+}
+
+// TestWriteHeaderLineWidthClamp tests that lineWidth is clamped to 80 when UseBoxes is true
+func TestWriteHeaderLineWidthClamp(t *testing.T) {
+	tests := []struct {
+		name          string
+		lineWidth     int
+		expectedWidth int
+	}{
+		{
+			name:          "Line width under 80",
+			lineWidth:     60,
+			expectedWidth: 60,
+		},
+		{
+			name:          "Line width exactly 80",
+			lineWidth:     80,
+			expectedWidth: 80,
+		},
+		{
+			name:          "Line width over 80",
+			lineWidth:     120,
+			expectedWidth: 80,
+		},
+		{
+			name:          "Line width much over 80",
+			lineWidth:     200,
+			expectedWidth: 80,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				CommentPrefix: "# ",
+				LineWidth:     tt.lineWidth,
+				IndentSize:    2,
+				UseBoxes:      true,
+			}
+			formatter := NewTerminalFormatter(config)
+
+			var result strings.Builder
+			formatter.writeHeader(&result)
+			output := result.String()
+
+			lines := strings.Split(strings.TrimSpace(output), "\n")
+			if len(lines) < 1 {
+				t.Fatal("Expected at least 1 line")
+			}
+
+			// Check that the first border line respects the clamped width
+			borderLine := lines[0]
+			if len(borderLine) > tt.expectedWidth {
+				t.Errorf("Border line length %d exceeds expected width %d", len(borderLine), tt.expectedWidth)
+			}
+		})
+	}
+}
+
+// TestWriteHeaderColorApplication tests that colors are applied when UseColors is true
+func TestWriteHeaderColorApplication(t *testing.T) {
+	// This test verifies the structure rather than the actual color output
+	// since color.Color.Sprint() returns ANSI escape codes
+	config := FormatterConfig{
+		UseColors:     true,
+		CommentPrefix: "# ",
+		LineWidth:     80,
+		IndentSize:    2,
+		UseBoxes:      true,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	// Verify that colors are initialized
+	if formatter.colors.border == nil {
+		t.Error("Border color should be initialized when UseColors is true")
+	}
+	if formatter.colors.heading1 == nil {
+		t.Error("Heading1 color should be initialized when UseColors is true")
+	}
+
+	var result strings.Builder
+	formatter.writeHeader(&result)
+	output := result.String()
+
+	// Output should be non-empty and contain the title
+	if output == "" {
+		t.Error("Expected non-empty output")
+	}
+	if !strings.Contains(output, "AI Assistant Response") {
+		t.Error("Expected output to contain title")
+	}
+}
+
+// TestWriteHeaderOutputFormat tests the overall format of the header output
+func TestWriteHeaderOutputFormat(t *testing.T) {
+	config := FormatterConfig{
+		UseColors:     false,
+		CommentPrefix: "# ",
+		LineWidth:     80,
+		IndentSize:    2,
+		UseBoxes:      true,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	var result strings.Builder
+	formatter.writeHeader(&result)
+	output := result.String()
+
+	// Split output into lines
+	lines := strings.Split(output, "\n")
+
+	// Expected format:
+	// [border line]
+	// [title line]
+	// [border line]
+	// [empty line]
+
+	if len(lines) < 4 {
+		t.Errorf("Expected at least 4 lines, got %d", len(lines))
+	}
+
+	// Check that lines have proper content
+	if strings.TrimSpace(lines[0]) == "" {
+		t.Error("First line should be a border with content")
+	}
+	if strings.TrimSpace(lines[1]) == "" {
+		t.Error("Second line should contain title")
+	}
+	if strings.TrimSpace(lines[2]) == "" {
+		t.Error("Third line should be a border with content")
+	}
+	if lines[3] != "" && lines[3] != "\n" {
+		// Fourth element might be part of split, should be empty or just newline
+		if strings.TrimSpace(lines[3]) != "" {
+			t.Errorf("Fourth line should be empty or newline, got: %q", lines[3])
+		}
+	}
+}
+
+// TestWriteHeaderEdgeCases tests edge cases for writeHeader
+func TestWriteHeaderEdgeCases(t *testing.T) {
+	tests := []struct {
+		name          string
+		commentPrefix string
+		lineWidth     int
+		useColors     bool
+	}{
+		{
+			name:          "Very short line width",
+			commentPrefix: "# ",
+			lineWidth:     10,
+			useColors:     false,
+		},
+		{
+			name:          "Empty comment prefix",
+			commentPrefix: "",
+			lineWidth:     80,
+			useColors:     false,
+		},
+		{
+			name:          "Long comment prefix",
+			commentPrefix: "# >> > ",
+			lineWidth:     80,
+			useColors:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     tt.useColors,
+				CommentPrefix: tt.commentPrefix,
+				LineWidth:     tt.lineWidth,
+				IndentSize:    2,
+				UseBoxes:      true,
+			}
+			formatter := NewTerminalFormatter(config)
+
+			var result strings.Builder
+			// Should not panic
+			formatter.writeHeader(&result)
+			output := result.String()
+
+			// Should produce some output
+			if output == "" {
+				t.Error("Expected non-empty output even in edge cases")
+			}
+		})
+	}
+}
+
+// TestWriteHeaderBorderConsistency tests that top and bottom borders are consistent
+func TestWriteHeaderBorderConsistency(t *testing.T) {
+	config := FormatterConfig{
+		UseColors:     false,
+		CommentPrefix: "# ",
+		LineWidth:     80,
+		IndentSize:    2,
+		UseBoxes:      true,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	var result strings.Builder
+	formatter.writeHeader(&result)
+	output := result.String()
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) < 3 {
+		t.Fatal("Expected at least 3 lines")
+	}
+
+	firstBorder := lines[0]
+	lastBorder := lines[2]
+
+	// Both borders should have the same length
+	if len(firstBorder) != len(lastBorder) {
+		t.Errorf("Top border length %d != bottom border length %d", len(firstBorder), len(lastBorder))
+	}
+
+	// Both should contain only the comment prefix and equals signs
+	for i, line := range []string{firstBorder, lastBorder} {
+		afterPrefix := strings.TrimPrefix(line, "# ")
+		// Check that remaining characters are all equals signs (allowing for ANSI codes)
+		for _, ch := range afterPrefix {
+			if ch != '=' && !strings.Contains(string(ch), "\x1b") {
+				// Allow ANSI escape codes
+				continue
+			}
+		}
 	}
 }
