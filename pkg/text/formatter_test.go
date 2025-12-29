@@ -2773,3 +2773,925 @@ More **bold** text with *emphasis* and additional [reference](url).`
 		_ = formatter.applyInlineFormatting(input)
 	}
 }
+
+// ============================================================================
+// TESTS FOR isTableRow METHOD
+// ============================================================================
+
+// TestIsTableRowBasic tests basic table row detection
+func TestIsTableRowBasic(t *testing.T) {
+	tests := []struct {
+		name      string
+		line      string
+		isTable   bool
+	}{
+		{
+			name:    "Valid table row",
+			line:    "| Header 1 | Header 2 |",
+			isTable: true,
+		},
+		{
+			name:    "Valid table row with spaces",
+			line:    "|  Header 1  |  Header 2  |",
+			isTable: true,
+		},
+		{
+			name:    "Table row without leading pipe",
+			line:    "Header 1 | Header 2 |",
+			isTable: false,
+		},
+		{
+			name:    "Table row without trailing pipe",
+			line:    "| Header 1 | Header 2",
+			isTable: false,
+		},
+		{
+			name:    "Single column table",
+			line:    "| Data |",
+			isTable: true,
+		},
+		{
+			name:    "Empty table row",
+			line:    "||",
+			isTable: true,
+		},
+		{
+			name:    "Not a table row",
+			line:    "Just regular text",
+			isTable: false,
+		},
+		{
+			name:    "Separator line (markdown table separator)",
+			line:    "|---|---|",
+			isTable: true,
+		},
+		{
+			name:    "Line with only pipes",
+			line:    "||||",
+			isTable: true,
+		},
+		{
+			name:    "Empty string",
+			line:    "",
+			isTable: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(FormatterConfig{})
+			result := formatter.isTableRow(tt.line)
+
+			if result != tt.isTable {
+				t.Errorf("isTableRow(%q) = %v, expected %v", tt.line, result, tt.isTable)
+			}
+		})
+	}
+}
+
+// TestIsTableRowWithWhitespace tests table row detection with whitespace
+func TestIsTableRowWithWhitespace(t *testing.T) {
+	tests := []struct {
+		name      string
+		line      string
+		isTable   bool
+	}{
+		{
+			name:    "Leading whitespace",
+			line:    "   | Data |",
+			isTable: true,
+		},
+		{
+			name:    "Trailing whitespace",
+			line:    "| Data |   ",
+			isTable: true,
+		},
+		{
+			name:    "Leading and trailing whitespace",
+			line:    "   | Data |   ",
+			isTable: true,
+		},
+		{
+			name:    "Tabs as whitespace",
+			line:    "\t| Data |\t",
+			isTable: true,
+		},
+		{
+			name:    "Mixed whitespace",
+			line:    "  \t | Data | \t  ",
+			isTable: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(FormatterConfig{})
+			result := formatter.isTableRow(tt.line)
+
+			if result != tt.isTable {
+				t.Errorf("isTableRow(%q) = %v, expected %v", tt.line, result, tt.isTable)
+			}
+		})
+	}
+}
+
+// TestIsTableRowComplexContent tests detection with complex cell content
+func TestIsTableRowComplexContent(t *testing.T) {
+	tests := []struct {
+		name    string
+		line    string
+		isTable bool
+	}{
+		{
+			name:    "Cells with special characters",
+			line:    "| @user | #tag | $money |",
+			isTable: true,
+		},
+		{
+			name:    "Cells with numbers",
+			line:    "| 123 | 456 | 789 |",
+			isTable: true,
+		},
+		{
+			name:    "Cells with markdown formatting",
+			line:    "| **bold** | *italic* | `code` |",
+			isTable: true,
+		},
+		{
+			name:    "Cells with URLs",
+			line:    "| https://example.com | http://test.com |",
+			isTable: true,
+		},
+		{
+			name:    "Cells with punctuation",
+			line:    "| Hello! | What? | Yes. |",
+			isTable: true,
+		},
+		{
+			name:    "Cells with emoji",
+			line:    "| 😀 | 🎉 | ✨ |",
+			isTable: true,
+		},
+		{
+			name:    "Cells with parentheses",
+			line:    "| (data) | [link] | {json} |",
+			isTable: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(FormatterConfig{})
+			result := formatter.isTableRow(tt.line)
+
+			if result != tt.isTable {
+				t.Errorf("isTableRow(%q) = %v, expected %v", tt.line, result, tt.isTable)
+			}
+		})
+	}
+}
+
+// ============================================================================
+// TESTS FOR extractTable METHOD
+// ============================================================================
+
+// TestExtractTableBasic tests basic table extraction
+func TestExtractTableBasic(t *testing.T) {
+	tests := []struct {
+		name          string
+		lines         []string
+		startIndex    int
+		expectedCount int
+		expectedText  string
+	}{
+		{
+			name: "Simple two-row table",
+			lines: []string{
+				"| Header 1 | Header 2 |",
+				"| Data 1   | Data 2   |",
+				"Some text",
+			},
+			startIndex:    0,
+			expectedCount: 2,
+			expectedText:  "Header 1",
+		},
+		{
+			name: "Single row table",
+			lines: []string{
+				"| Header |",
+				"Not a table row",
+			},
+			startIndex:    0,
+			expectedCount: 1,
+			expectedText:  "Header",
+		},
+		{
+			name: "Multi-row table",
+			lines: []string{
+				"| Col1 | Col2 | Col3 |",
+				"| A    | B    | C    |",
+				"| D    | E    | F    |",
+				"| G    | H    | I    |",
+				"End of table",
+			},
+			startIndex:    0,
+			expectedCount: 4,
+			expectedText:  "Col1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(FormatterConfig{})
+			result := formatter.extractTable(tt.lines, tt.startIndex)
+
+			if len(result) != tt.expectedCount {
+				t.Errorf("extractTable returned %d rows, expected %d", len(result), tt.expectedCount)
+			}
+
+			if len(result) > 0 && !strings.Contains(result[0], tt.expectedText) {
+				t.Errorf("extractTable should contain %q, got %q", tt.expectedText, result[0])
+			}
+		})
+	}
+}
+
+// TestExtractTableFromMiddle tests extracting table from middle of lines
+func TestExtractTableFromMiddle(t *testing.T) {
+	lines := []string{
+		"Some introduction text",
+		"More text here",
+		"| Header 1 | Header 2 |",
+		"| Data 1   | Data 2   |",
+		"| Data 3   | Data 4   |",
+		"Text after table",
+	}
+
+	formatter := NewTerminalFormatter(FormatterConfig{})
+	result := formatter.extractTable(lines, 2)
+
+	if len(result) != 3 {
+		t.Errorf("extractTable from index 2 should return 3 rows, got %d", len(result))
+	}
+
+	if !strings.Contains(result[0], "Header 1") {
+		t.Errorf("First extracted row should contain 'Header 1', got %q", result[0])
+	}
+}
+
+// TestExtractTableStopsAtBlankLine tests extraction stops at blank lines
+func TestExtractTableStopsAtBlankLine(t *testing.T) {
+	lines := []string{
+		"| Header 1 | Header 2 |",
+		"| Data 1   | Data 2   |",
+		"",
+		"| This | Should not |",
+		"| be  | extracted   |",
+	}
+
+	formatter := NewTerminalFormatter(FormatterConfig{})
+	result := formatter.extractTable(lines, 0)
+
+	if len(result) != 2 {
+		t.Errorf("extractTable should stop at blank line, got %d rows", len(result))
+	}
+}
+
+// TestExtractTableStopsAtNonTableRow tests extraction stops at non-table rows
+func TestExtractTableStopsAtNonTableRow(t *testing.T) {
+	lines := []string{
+		"| Header 1 | Header 2 |",
+		"| Data 1   | Data 2   |",
+		"This is not a table row",
+		"| This | Should not |",
+	}
+
+	formatter := NewTerminalFormatter(FormatterConfig{})
+	result := formatter.extractTable(lines, 0)
+
+	if len(result) != 2 {
+		t.Errorf("extractTable should stop at non-table row, got %d rows", len(result))
+	}
+}
+
+// TestExtractTableEdgeCases tests edge cases for table extraction
+func TestExtractTableEdgeCases(t *testing.T) {
+	tests := []struct {
+		name          string
+		lines         []string
+		startIndex    int
+		expectedCount int
+	}{
+		{
+			name:          "Empty lines array",
+			lines:         []string{},
+			startIndex:    0,
+			expectedCount: 0,
+		},
+		{
+			name: "Start index at end of array",
+			lines: []string{
+				"| Header |",
+			},
+			startIndex:    0,
+			expectedCount: 1,
+		},
+		{
+			name: "No table rows from start index",
+			lines: []string{
+				"Text",
+				"More text",
+			},
+			startIndex:    0,
+			expectedCount: 0,
+		},
+		{
+			name: "Only one table row",
+			lines: []string{
+				"| Single |",
+			},
+			startIndex:    0,
+			expectedCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(FormatterConfig{})
+			result := formatter.extractTable(tt.lines, tt.startIndex)
+
+			if len(result) != tt.expectedCount {
+				t.Errorf("extractTable returned %d rows, expected %d", len(result), tt.expectedCount)
+			}
+		})
+	}
+}
+
+// TestExtractTableWithWhitespace tests extraction with various whitespace
+func TestExtractTableWithWhitespace(t *testing.T) {
+	lines := []string{
+		"   | Header 1 | Header 2 |   ",
+		"| Data 1 | Data 2 |",
+		"\t| Data 3 | Data 4 |\t",
+	}
+
+	formatter := NewTerminalFormatter(FormatterConfig{})
+	result := formatter.extractTable(lines, 0)
+
+	if len(result) != 3 {
+		t.Errorf("extractTable should handle whitespace, got %d rows", len(result))
+	}
+}
+
+// ============================================================================
+// TESTS FOR writeTable METHOD
+// ============================================================================
+
+// TestWriteTableBasic tests basic table writing with colors disabled
+func TestWriteTableBasic(t *testing.T) {
+	tableLines := []string{
+		"| Header 1 | Header 2 |",
+		"| Data 1   | Data 2   |",
+		"| Data 3   | Data 4   |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, tableLines)
+	output := result.String()
+
+	// Check table structure
+	if !strings.Contains(output, "│") {
+		t.Error("Table output should contain table borders (│)")
+	}
+	if !strings.Contains(output, "─") {
+		t.Error("Table output should contain table separators (─)")
+	}
+	if !strings.Contains(output, "Header 1") {
+		t.Error("Table output should contain header text")
+	}
+}
+
+// TestWriteTableWithColors tests table writing with colors enabled
+func TestWriteTableWithColors(t *testing.T) {
+	tableLines := []string{
+		"| Header 1 | Header 2 |",
+		"| Data 1   | Data 2   |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     true,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, tableLines)
+	output := result.String()
+
+	// Check basic structure is maintained with colors
+	if output == "" {
+		t.Error("Table output should not be empty")
+	}
+	if !strings.Contains(output, "Header 1") {
+		t.Error("Table output should contain header text")
+	}
+}
+
+// TestWriteTableCellPadding tests proper cell padding in tables
+func TestWriteTableCellPadding(t *testing.T) {
+	tableLines := []string{
+		"| A | Long Header |",
+		"| X | Y           |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, tableLines)
+	output := result.String()
+
+	// Table should properly pad cells
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) < 3 {
+		t.Error("Table should have at least 3 lines (header, separator, data)")
+	}
+
+	// Check that separator is present (after header)
+	hasSeparator := false
+	for _, line := range lines {
+		if strings.Contains(line, "┼") || strings.Contains(line, "─") {
+			hasSeparator = true
+			break
+		}
+	}
+	if !hasSeparator {
+		t.Error("Table should have separator line")
+	}
+}
+
+// TestWriteTableColumnWidthCalculation tests proper column width calculation
+func TestWriteTableColumnWidthCalculation(t *testing.T) {
+	tableLines := []string{
+		"| Short | Very Long Header |",
+		"| X     | Y                |",
+		"| A     | B                |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, tableLines)
+	output := result.String()
+
+	// Should handle different column widths
+	if !strings.Contains(output, "Very Long Header") {
+		t.Error("Table should contain long header text")
+	}
+
+	// Parse output and check column alignment
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) > 0 {
+		firstLine := lines[0]
+		secondLine := ""
+		if len(lines) > 2 {
+			secondLine = lines[2] // Data row after separator
+		}
+
+		// Columns should be properly aligned
+		if firstLine != "" && secondLine != "" {
+			// Count pipes to verify structure
+			firstPipes := strings.Count(firstLine, "│")
+			secondPipes := strings.Count(secondLine, "│")
+			if firstPipes != secondPipes {
+				t.Errorf("Column count mismatch: %d vs %d pipes", firstPipes, secondPipes)
+			}
+		}
+	}
+}
+
+// TestWriteTableBorderRendering tests border rendering
+func TestWriteTableBorderRendering(t *testing.T) {
+	tableLines := []string{
+		"| Header 1 | Header 2 | Header 3 |",
+		"| Data 1   | Data 2   | Data 3   |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, tableLines)
+	output := result.String()
+
+	// Check for border characters
+	expectedBorders := []string{"│", "─", "├", "┤", "┼"}
+	for _, border := range expectedBorders {
+		if !strings.Contains(output, border) {
+			t.Errorf("Table output should contain border character %q", border)
+		}
+	}
+}
+
+// TestWriteTableCommentPrefix tests comment prefix application
+func TestWriteTableCommentPrefix(t *testing.T) {
+	tests := []struct {
+		name   string
+		prefix string
+	}{
+		{"Hash prefix", "# "},
+		{"Arrow prefix", ">> "},
+		{"Colon prefix", ": "},
+		{"Empty prefix", ""},
+	}
+
+	tableLines := []string{
+		"| Header |",
+		"| Data   |",
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: tt.prefix,
+				UseColors:     false,
+			}
+			formatter := NewTerminalFormatter(config)
+			var result strings.Builder
+
+			formatter.writeTable(&result, tableLines)
+			output := result.String()
+
+			// First non-empty line should have the prefix
+			lines := strings.Split(output, "\n")
+			for _, line := range lines {
+				if line != "" && tt.prefix != "" {
+					if !strings.HasPrefix(line, tt.prefix) {
+						t.Errorf("Line should start with prefix %q, got %q", tt.prefix, line)
+					}
+					break
+				}
+			}
+		})
+	}
+}
+
+// TestWriteTableEmptyTable tests handling of empty table
+func TestWriteTableEmptyTable(t *testing.T) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, []string{})
+	output := result.String()
+
+	// Should handle empty table gracefully
+	if output != "" {
+		t.Error("Empty table should produce empty output")
+	}
+}
+
+// TestWriteTableSingleColumn tests single column tables
+func TestWriteTableSingleColumn(t *testing.T) {
+	tableLines := []string{
+		"| Header |",
+		"| Data 1 |",
+		"| Data 2 |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, tableLines)
+	output := result.String()
+
+	if !strings.Contains(output, "Header") {
+		t.Error("Single column table should display header")
+	}
+	if !strings.Contains(output, "Data 1") {
+		t.Error("Single column table should display data")
+	}
+}
+
+// TestWriteTableMultipleColumns tests tables with many columns
+func TestWriteTableMultipleColumns(t *testing.T) {
+	tableLines := []string{
+		"| C1 | C2 | C3 | C4 | C5 |",
+		"| A  | B  | C  | D  | E  |",
+		"| F  | G  | H  | I  | J  |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, tableLines)
+	output := result.String()
+
+	// All columns should be present
+	cols := []string{"C1", "C2", "C3", "C4", "C5"}
+	for _, col := range cols {
+		if !strings.Contains(output, col) {
+			t.Errorf("Table should contain column %q", col)
+		}
+	}
+}
+
+// TestWriteTableWithSpecialCharacters tests tables with special characters
+func TestWriteTableWithSpecialCharacters(t *testing.T) {
+	tableLines := []string{
+		"| @user | #tag | $money |",
+		"| test  | data | value  |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, tableLines)
+	output := result.String()
+
+	if !strings.Contains(output, "@user") {
+		t.Error("Table should preserve special characters")
+	}
+}
+
+// TestWriteTableWithMarkdown tests tables containing markdown formatting
+func TestWriteTableWithMarkdown(t *testing.T) {
+	tableLines := []string{
+		"| **bold** | *italic* | `code` |",
+		"| Normal   | Text     | Here   |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, tableLines)
+	output := result.String()
+
+	// Markdown should be preserved in table cells
+	if !strings.Contains(output, "bold") {
+		t.Error("Table should contain markdown text")
+	}
+}
+
+// TestWriteTableIntegration tests table writing within format flow
+func TestWriteTableIntegration(t *testing.T) {
+	config := DefaultConfig()
+	config.RenderTables = true
+	formatter := NewTerminalFormatter(config)
+
+	input := `Here's a table:
+
+| Name  | Age |
+| John  | 30  |
+| Jane  | 25  |
+
+And some text after.`
+
+	result := formatter.Format(input)
+
+	// Should contain table content
+	if !strings.Contains(result, "Name") || !strings.Contains(result, "Age") {
+		t.Error("Formatted output should contain table content")
+	}
+}
+
+// TestWriteTableLongContent tests tables with long content in cells
+func TestWriteTableLongContent(t *testing.T) {
+	tableLines := []string{
+		"| This is a very long header | Short |",
+		"| Some long content here     | Data  |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, tableLines)
+	output := result.String()
+
+	if !strings.Contains(output, "very long header") {
+		t.Error("Table should handle long content")
+	}
+}
+
+// TestWriteTableSeparatorLine tests separator line rendering
+func TestWriteTableSeparatorLine(t *testing.T) {
+	tableLines := []string{
+		"| Header 1 | Header 2 |",
+		"| Data 1   | Data 2   |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, tableLines)
+	output := result.String()
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+
+	// Should have separator after header (first row should be header)
+	if len(lines) < 3 {
+		t.Error("Table should have header, separator, and at least one data row")
+	}
+
+	// Second line should be the separator
+	if len(lines) >= 2 {
+		separatorLine := lines[1]
+		if !strings.Contains(separatorLine, "─") {
+			t.Errorf("Separator line should contain dashes, got: %q", separatorLine)
+		}
+		if !strings.Contains(separatorLine, "├") || !strings.Contains(separatorLine, "┤") {
+			t.Errorf("Separator line should have proper borders, got: %q", separatorLine)
+		}
+	}
+}
+
+// TestWriteTableNoExtraBlankLines tests that table doesn't add unnecessary blank lines
+func TestWriteTableNoExtraBlankLines(t *testing.T) {
+	tableLines := []string{
+		"| Header |",
+		"| Data   |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+		CompactMode:   true,
+	}
+	formatter := NewTerminalFormatter(config)
+	var result strings.Builder
+
+	formatter.writeTable(&result, tableLines)
+	output := result.String()
+
+	// Should have trailing newline
+	if !strings.HasSuffix(output, "\n") {
+		t.Error("Table output should end with newline")
+	}
+}
+
+// ============================================================================
+// BENCHMARK TESTS FOR TABLE METHODS
+// ============================================================================
+
+// BenchmarkIsTableRow benchmarks the isTableRow method
+func BenchmarkIsTableRow(b *testing.B) {
+	formatter := NewTerminalFormatter(FormatterConfig{})
+	line := "| Header 1 | Header 2 | Header 3 |"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.isTableRow(line)
+	}
+}
+
+// BenchmarkIsTableRowFalse benchmarks isTableRow with non-table input
+func BenchmarkIsTableRowFalse(b *testing.B) {
+	formatter := NewTerminalFormatter(FormatterConfig{})
+	line := "This is just regular text without pipes"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.isTableRow(line)
+	}
+}
+
+// BenchmarkExtractTable benchmarks the extractTable method
+func BenchmarkExtractTable(b *testing.B) {
+	lines := []string{
+		"| Header 1 | Header 2 | Header 3 |",
+		"| Data 1   | Data 2   | Data 3   |",
+		"| Data 4   | Data 5   | Data 6   |",
+		"| Data 7   | Data 8   | Data 9   |",
+		"Not a table row",
+	}
+
+	formatter := NewTerminalFormatter(FormatterConfig{})
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.extractTable(lines, 0)
+	}
+}
+
+// BenchmarkExtractTableLarge benchmarks extractTable with large table
+func BenchmarkExtractTableLarge(b *testing.B) {
+	var lines []string
+	lines = append(lines, "| Col1 | Col2 | Col3 | Col4 | Col5 |")
+	for i := 0; i < 100; i++ {
+		lines = append(lines, "| Data | Data | Data | Data | Data |")
+	}
+	lines = append(lines, "End of table")
+
+	formatter := NewTerminalFormatter(FormatterConfig{})
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.extractTable(lines, 0)
+	}
+}
+
+// BenchmarkWriteTable benchmarks the writeTable method
+func BenchmarkWriteTable(b *testing.B) {
+	tableLines := []string{
+		"| Header 1 | Header 2 | Header 3 |",
+		"| Data 1   | Data 2   | Data 3   |",
+		"| Data 4   | Data 5   | Data 6   |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var result strings.Builder
+		formatter.writeTable(&result, tableLines)
+	}
+}
+
+// BenchmarkWriteTableWithColors benchmarks writeTable with colors enabled
+func BenchmarkWriteTableWithColors(b *testing.B) {
+	tableLines := []string{
+		"| Header 1 | Header 2 | Header 3 |",
+		"| Data 1   | Data 2   | Data 3   |",
+		"| Data 4   | Data 5   | Data 6   |",
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     true,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var result strings.Builder
+		formatter.writeTable(&result, tableLines)
+	}
+}
+
+// BenchmarkWriteTableLarge benchmarks writeTable with large table
+func BenchmarkWriteTableLarge(b *testing.B) {
+	var tableLines []string
+	tableLines = append(tableLines, "| Col1 | Col2 | Col3 | Col4 | Col5 |")
+	for i := 0; i < 50; i++ {
+		tableLines = append(tableLines, "| Data | Data | Data | Data | Data |")
+	}
+
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseColors:     false,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var result strings.Builder
+		formatter.writeTable(&result, tableLines)
+	}
+}
