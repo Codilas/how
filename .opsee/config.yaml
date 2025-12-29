@@ -1,111 +1,100 @@
-project:
-  name: how
-  type: CLI Application
-  description: AI-powered shell assistant that provides command suggestions, code
-    generation, and explanations from the terminal
-  language: Go
-  repository: https://github.com/Codilas/how
+? Based on the information provided in the prompt (file structure, go.mod, and README.md), I have sufficient context to generate the .opsee configuration file. Let me produce the output
+: null
+architecture:
+    data_flow: "User input via CLI args -> Cobra command parsing -> \nAI provider API call -> Response formatting -> Terminal output\n"
+    key_files:
+        - path: cmd/
+          role: Main entry point and cobra command definitions
+        - path: internal/
+          role: Core business logic, AI provider integrations, context gathering
+        - path: pkg/
+          role: Reusable utilities that could be imported by other projects
+    pattern: standard go project layout (cmd/internal/pkg)
 codebase_map:
-  apps:
-  - name: how
-    path: cmd/how
-    description: Main CLI entry point
-  packages:
-  - name: cli
-    path: internal/cli
-    description: Cobra-based command interface, subcommands, and REPL loop
-  - name: config
-    path: internal/config
-    description: Configuration loading and management from YAML files
-  - name: context
-    path: internal/context
-    description: Context gathering - git info, shell history, project metadata
-  - name: manager
-    path: internal/manager
-    description: Provider factory and registration system for AI backends
-  - name: providers
-    path: pkg/providers
-    description: Pluggable interface for AI providers, utilities, and type definitions
-  - name: anthropic
-    path: pkg/providers/anthropic
-    description: Anthropic Claude API implementation with streaming support
-  - name: extractor
-    path: pkg/extractor
-    description: Command extraction from AI responses and text parsing
-  - name: text
-    path: pkg/text
-    description: Terminal formatting and output rendering
-  - name: version
-    path: pkg/version
-    description: Build version and metadata injection
-tech_stack:
-  language: Go 1.22.4
-  core_libraries:
-  - 'github.com/spf13/cobra: CLI framework'
-  - 'github.com/spf13/viper: Configuration management'
-  - 'github.com/AlecAivazis/survey: Interactive prompts'
-  - 'github.com/fatih/color: Terminal colors'
-  - 'github.com/briandowns/spinner: Loading spinners'
-  databases: null
-  external_services:
-  - Anthropic Claude API
-  build_tools:
-  - Make
-  - GoReleaser
-purpose:
-  goals:
-  - Provide AI-powered shell assistance directly from terminal
-  - Support multiple AI providers with pluggable architecture
-  - Gather context from shell environment for smarter responses
-  - Suggest safe and unsafe commands with descriptions
-  key_features:
-  - Context-aware prompts (git info, directory, shell history)
-  - Multi-provider support (Claude, extensible to others)
-  - Command extraction and safety warnings
-  - Streaming and buffered response modes
-  - Shell history integration
-  - Setup wizard for provider configuration
-  architecture_patterns:
-  - Provider pattern for extensible AI backends
-  - Cobra CLI command structure with subcommands
-  - Viper configuration management
-  - Factory pattern for provider creation
-  - Streaming channel-based responses
-development:
-  setup_commands:
-  - 'make setup-dev: Install dev dependencies and golangci-lint'
-  - 'go mod download: Download module dependencies'
-  dev_server: null
-  build_command: make build
-  run_command: make dev && ./bin/how <prompt>
-  essential_commands:
-  - 'make build: Compile binary to bin/how'
-  - 'make test: Run all tests'
-  - 'make fmt: Format code with gofmt'
-  - 'make deps: Tidy and download dependencies'
-verification:
-  test_command: make test
-  test_verbose: make test-race
-  type_check: null
-  lint: make lint
-  build: make build
+    directories:
+        cmd:
+            entry: cmd/main.go or cmd/how/main.go
+            path: cmd/
+            purpose: CLI entry points and command definitions
+        internal:
+            path: internal/
+            purpose: Private application code not importable by other projects
+        pkg:
+            path: pkg/
+            purpose: Public library code that can be imported by external projects
+        scripts:
+            path: scripts/
+            purpose: Build and installation scripts
+commands:
+    build: make build
+    dev: make dev
+    install: make install
+    setup_dev: make setup-dev
+    test: make test
+common_tasks:
+    add_ai_provider:
+        - Implement provider interface in internal/
+        - Add provider selection in config/setup
+        - Update viper config structure
+    add_command:
+        - Create new file in cmd/ directory
+        - Define cobra.Command with Use, Short, Long, Run
+        - Register with parent command in init()
+    add_feature:
+        - Add business logic in internal/
+        - Expose via cobra command in cmd/
+        - Add configuration options via viper
 conventions:
-  package_structure:
-  - 'cmd/*: Application entry points'
-  - 'internal/*: Private packages not exported'
-  - 'pkg/*: Public reusable packages'
-  naming:
-  - PascalCase for exported types and functions
-  - camelCase for unexported identifiers
-  - Provider implementations in their own subdirectories
-  code_patterns:
-  - Interfaces in providers/interface.go for extensibility
-  - Config structs with embedded types
-  - Error handling with early returns
-  - Context passed as function parameter for cancellation
-  key_files:
-  - 'internal/cli/root.go: Main command handler and provider orchestration'
-  - 'pkg/providers/interface.go: Provider interface definition'
-  - 'pkg/providers/anthropic/provider.go: Claude implementation'
-  - 'internal/config/config.go: Configuration structures'
-  - 'Makefile: Build and development targets'
+    file_organization: |
+        cmd/how/main.go - CLI entry point
+        internal/provider/ - AI provider implementations
+        internal/context/ - Shell context gathering
+        pkg/ - Reusable, exportable utilities
+    naming:
+        constants: CamelCase for exported, camelCase for private
+        files: lowercase with underscores (go standard)
+        functions: CamelCase for exported, camelCase for private
+        packages: lowercase, short, no underscores
+    patterns:
+        - Follow standard Go project layout with cmd/internal/pkg
+        - Use cobra for all CLI commands with proper subcommand structure
+        - Configuration via viper supporting YAML files and environment variables
+        - Error handling with explicit error returns, no panic in library code
+development:
+    run: make dev && ./bin/how
+    setup:
+        - git clone https://github.com/Codilas/how.git
+        - cd how
+        - make setup-dev
+project:
+    description: AI shell assistant for commands, explanations, and code generation
+    framework: cobra
+    name: how
+    primary_language: go
+    type: cli
+tech_stack:
+    cache: none
+    database: none
+    framework: cobra for CLI framework
+    key_libraries:
+        - name: spf13/cobra
+          purpose: CLI command structure and argument parsing
+        - name: spf13/viper
+          purpose: Configuration management with file and env support
+        - name: AlecAivazis/survey/v2
+          purpose: Interactive prompts for setup wizard
+        - name: briandowns/spinner
+          purpose: Terminal spinners for async operations
+        - name: fatih/color
+          purpose: Colored terminal output
+        - name: gopkg.in/yaml.v3
+          purpose: YAML config file parsing
+    package_manager: go modules
+    runtime: go 1.22.4
+testing:
+    framework: go test (standard library)
+    location: '*_test.go files alongside source files'
+    patterns:
+        - Table-driven tests for multiple input scenarios
+        - Test files in same package as source
+    run: make test or go test ./...
