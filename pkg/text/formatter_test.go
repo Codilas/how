@@ -4530,3 +4530,732 @@ func BenchmarkFormatTextLineListItem(b *testing.B) {
 		_ = formatter.formatTextLine(input)
 	}
 }
+
+// ============================================================================
+// TESTS FOR wrapLine METHOD
+// ============================================================================
+
+// TestWrapLineBasic tests basic line wrapping at configured width
+func TestWrapLineBasic(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		lineWidth      int
+		expectedLines  int
+		commentPrefix  string
+	}{
+		{
+			name:          "Line shorter than width",
+			input:         "# Short line",
+			lineWidth:     80,
+			expectedLines: 1,
+			commentPrefix: "# ",
+		},
+		{
+			name:          "Line exactly at width",
+			input:         "# " + strings.Repeat("a", 78),
+			lineWidth:     80,
+			expectedLines: 1,
+			commentPrefix: "# ",
+		},
+		{
+			name:          "Line one char over width",
+			input:         "# " + strings.Repeat("a", 79),
+			lineWidth:     80,
+			expectedLines: 2,
+			commentPrefix: "# ",
+		},
+		{
+			name:          "Very long line",
+			input:         "# " + strings.Repeat("word ", 50),
+			lineWidth:     80,
+			expectedLines: 10,
+			commentPrefix: "# ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: tt.commentPrefix,
+				LineWidth:     tt.lineWidth,
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.wrapLine(tt.input)
+			lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
+
+			if len(lines) != tt.expectedLines {
+				t.Errorf("Expected %d lines, got %d. Result:\n%s", tt.expectedLines, len(lines), result)
+			}
+		})
+	}
+}
+
+// TestWrapLineWordBoundaries tests that wrapping respects word boundaries
+func TestWrapLineWordBoundaries(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		lineWidth      int
+		shouldNotSplit string
+	}{
+		{
+			name:           "Word not split at boundary",
+			input:          "# This is a test sentence with multiple words",
+			lineWidth:      30,
+			shouldNotSplit: "sentence",
+		},
+		{
+			name:           "Preserves complete words",
+			input:          "# The quick brown fox jumps",
+			lineWidth:      20,
+			shouldNotSplit: "quick",
+		},
+		{
+			name:           "Words wrapped cleanly",
+			input:          "# Hello world from the formatter",
+			lineWidth:      25,
+			shouldNotSplit: "world",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				LineWidth:     tt.lineWidth,
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.wrapLine(tt.input)
+			lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
+
+			// Each line should not split words
+			found := false
+			for _, line := range lines {
+				if strings.Contains(line, tt.shouldNotSplit) {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				t.Errorf("Word %q should be complete on one line, got:\n%s", tt.shouldNotSplit, result)
+			}
+		})
+	}
+}
+
+// TestWrapLineContinuationIndentation tests that continuation lines have proper indentation
+func TestWrapLineContinuationIndentation(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		lineWidth     int
+		indentSize    int
+		commentPrefix string
+	}{
+		{
+			name:          "Two-space continuation indent",
+			input:         "# " + strings.Repeat("word ", 30),
+			lineWidth:     40,
+			indentSize:    2,
+			commentPrefix: "# ",
+		},
+		{
+			name:          "Four-space continuation indent",
+			input:         "# " + strings.Repeat("word ", 30),
+			lineWidth:     40,
+			indentSize:    4,
+			commentPrefix: "# ",
+		},
+		{
+			name:          "Continuation with arrow prefix",
+			input:         ">> " + strings.Repeat("word ", 30),
+			lineWidth:     40,
+			indentSize:    2,
+			commentPrefix: ">> ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: tt.commentPrefix,
+				LineWidth:     tt.lineWidth,
+				IndentSize:    tt.indentSize,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.wrapLine(tt.input)
+			lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
+
+			if len(lines) > 1 {
+				// Check that continuation lines have proper indentation
+				for i := 1; i < len(lines); i++ {
+					expectedIndent := tt.commentPrefix + strings.Repeat(" ", tt.indentSize)
+					if !strings.HasPrefix(lines[i], expectedIndent) {
+						t.Errorf("Line %d should start with continuation indent %q, got: %q",
+							i, expectedIndent, lines[i])
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestWrapLineEdgeCaseVeryLongWord tests handling of very long words that exceed line width
+func TestWrapLineEdgeCaseVeryLongWord(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		lineWidth int
+	}{
+		{
+			name:      "Single very long word",
+			input:     "# " + strings.Repeat("x", 100),
+			lineWidth: 40,
+		},
+		{
+			name:      "Very long word with other text",
+			input:     "# prefix " + strings.Repeat("verylongword", 10) + " suffix",
+			lineWidth: 50,
+		},
+		{
+			name:      "Multiple very long words",
+			input:     "# " + strings.Repeat("a", 50) + " " + strings.Repeat("b", 50),
+			lineWidth: 40,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				LineWidth:     tt.lineWidth,
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+
+			// Should not panic
+			result := formatter.wrapLine(tt.input)
+
+			// Should return something
+			if result == "" {
+				t.Error("Expected non-empty result")
+			}
+
+			// Should contain the prefix
+			if !strings.Contains(result, "# ") {
+				t.Errorf("Result should contain comment prefix, got:\n%s", result)
+			}
+		})
+	}
+}
+
+// TestWrapLineEdgeCaseEmptyContent tests wrapping of empty or whitespace-only content
+func TestWrapLineEdgeCaseEmptyContent(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		lineWidth int
+	}{
+		{
+			name:      "Empty string",
+			input:     "",
+			lineWidth: 80,
+		},
+		{
+			name:      "Only prefix",
+			input:     "# ",
+			lineWidth: 80,
+		},
+		{
+			name:      "Only whitespace after prefix",
+			input:     "#    ",
+			lineWidth: 80,
+		},
+		{
+			name:      "Just comment prefix no space",
+			input:     "#",
+			lineWidth: 80,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				LineWidth:     tt.lineWidth,
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.wrapLine(tt.input)
+
+			// Should return original or minimal output for empty content
+			if result == "" {
+				t.Logf("Empty input returned empty result (acceptable)")
+			}
+		})
+	}
+}
+
+// TestWrapLineSingleWord tests wrapping with single word
+func TestWrapLineSingleWord(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		lineWidth int
+	}{
+		{
+			name:      "Single short word",
+			input:     "# hello",
+			lineWidth: 80,
+		},
+		{
+			name:      "Single word at limit",
+			input:     "# " + strings.Repeat("a", 78),
+			lineWidth: 80,
+		},
+		{
+			name:      "Single word over limit",
+			input:     "# " + strings.Repeat("a", 79),
+			lineWidth: 40,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				LineWidth:     tt.lineWidth,
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.wrapLine(tt.input)
+
+			if result == "" {
+				t.Error("Expected non-empty result for single word")
+			}
+
+			// Should start with prefix
+			if !strings.HasPrefix(result, "# ") {
+				t.Errorf("Result should start with prefix, got: %q", result)
+			}
+		})
+	}
+}
+
+// TestWrapLinePreservesContent tests that wrapping preserves all content
+func TestWrapLinePreservesContent(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		config FormatterConfig
+	}{
+		{
+			name:  "Simple content preservation",
+			input: "# The quick brown fox jumps over the lazy dog",
+			config: FormatterConfig{
+				CommentPrefix: "# ",
+				LineWidth:     30,
+				IndentSize:    2,
+			},
+		},
+		{
+			name:  "Content with special characters",
+			input: "# Hello-world, this is a test! How are you?",
+			config: FormatterConfig{
+				CommentPrefix: "# ",
+				LineWidth:     35,
+				IndentSize:    2,
+			},
+		},
+		{
+			name:  "Content with numbers",
+			input: "# Version 1.2.3 released with 100% new features",
+			config: FormatterConfig{
+				CommentPrefix: "# ",
+				LineWidth:     40,
+				IndentSize:    2,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(tt.config)
+			result := formatter.wrapLine(tt.input)
+
+			// Extract content without prefix and indentation
+			result = strings.ReplaceAll(result, tt.config.CommentPrefix, "")
+			result = strings.ReplaceAll(result, strings.Repeat(" ", tt.config.IndentSize), "")
+			result = strings.ReplaceAll(result, "\n", " ")
+			result = strings.TrimSpace(result)
+
+			inputWords := strings.Fields(tt.input)
+			for _, word := range inputWords {
+				// Remove prefix if present
+				word = strings.TrimPrefix(word, tt.config.CommentPrefix)
+				if word != "" && !strings.Contains(result, word) {
+					t.Errorf("Content missing word %q in result:\n%s", word, result)
+				}
+			}
+		})
+	}
+}
+
+// TestWrapLineMultipleWraps tests lines that wrap multiple times
+func TestWrapLineMultipleWraps(t *testing.T) {
+	tests := []struct {
+		name            string
+		input           string
+		lineWidth       int
+		minExpectedLines int
+	}{
+		{
+			name:            "Wrap to 3 lines",
+			input:           "# " + strings.Repeat("word ", 40),
+			lineWidth:       40,
+			minExpectedLines: 3,
+		},
+		{
+			name:            "Wrap to 5 lines",
+			input:           "# " + strings.Repeat("word ", 80),
+			lineWidth:       35,
+			minExpectedLines: 5,
+		},
+		{
+			name:            "Wrap to many lines",
+			input:           "# " + strings.Repeat("word ", 200),
+			lineWidth:       30,
+			minExpectedLines: 10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				LineWidth:     tt.lineWidth,
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.wrapLine(tt.input)
+			lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
+
+			if len(lines) < tt.minExpectedLines {
+				t.Errorf("Expected at least %d lines, got %d", tt.minExpectedLines, len(lines))
+			}
+
+			// Verify each line respects the width
+			for i, line := range lines {
+				if len(line) > tt.lineWidth {
+					t.Errorf("Line %d exceeds width: %d > %d", i, len(line), tt.lineWidth)
+				}
+			}
+		})
+	}
+}
+
+// TestWrapLineLineWidthRespect tests that wrapped lines respect configured width
+func TestWrapLineLineWidthRespect(t *testing.T) {
+	tests := []struct {
+		name      string
+		lineWidth int
+		input     string
+	}{
+		{
+			name:      "Width 40",
+			lineWidth: 40,
+			input:     "# " + strings.Repeat("word ", 30),
+		},
+		{
+			name:      "Width 60",
+			lineWidth: 60,
+			input:     "# " + strings.Repeat("word ", 50),
+		},
+		{
+			name:      "Width 100",
+			lineWidth: 100,
+			input:     "# " + strings.Repeat("word ", 40),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				LineWidth:     tt.lineWidth,
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.wrapLine(tt.input)
+			lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
+
+			for i, line := range lines {
+				if len(line) > tt.lineWidth {
+					t.Errorf("Line %d (length %d) exceeds configured width %d: %q",
+						i, len(line), tt.lineWidth, line)
+				}
+			}
+		})
+	}
+}
+
+// TestWrapLineFirstLineFormat tests that first line has correct format
+func TestWrapLineFirstLineFormat(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		commentPrefix string
+	}{
+		{
+			name:          "Hash prefix",
+			input:         "# " + strings.Repeat("word ", 30),
+			commentPrefix: "# ",
+		},
+		{
+			name:          "Arrow prefix",
+			input:         ">> " + strings.Repeat("word ", 30),
+			commentPrefix: ">> ",
+		},
+		{
+			name:          "Empty prefix",
+			input:         strings.Repeat("word ", 30),
+			commentPrefix: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: tt.commentPrefix,
+				LineWidth:     40,
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.wrapLine(tt.input)
+			lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
+
+			if len(lines) == 0 {
+				t.Fatal("Expected at least one line")
+			}
+
+			firstLine := lines[0]
+			if tt.commentPrefix != "" {
+				if !strings.HasPrefix(firstLine, tt.commentPrefix) {
+					t.Errorf("First line should start with %q, got: %q", tt.commentPrefix, firstLine)
+				}
+			}
+		})
+	}
+}
+
+// TestWrapLineContinuationLineFormat tests that continuation lines have correct format
+func TestWrapLineContinuationLineFormat(t *testing.T) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		LineWidth:     30,
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	input := "# " + strings.Repeat("word ", 50)
+	result := formatter.wrapLine(input)
+	lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
+
+	if len(lines) < 2 {
+		t.Skip("Need at least 2 lines to test continuation format")
+	}
+
+	// Check continuation lines
+	expectedContinuationPrefix := "# " + strings.Repeat(" ", 2)
+	for i := 1; i < len(lines); i++ {
+		if !strings.HasPrefix(lines[i], expectedContinuationPrefix) {
+			t.Errorf("Continuation line %d should start with %q, got: %q",
+				i, expectedContinuationPrefix, lines[i])
+		}
+	}
+}
+
+// TestWrapLineNoWrapNeeded tests that lines not exceeding width aren't wrapped
+func TestWrapLineNoWrapNeeded(t *testing.T) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		LineWidth:     80,
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	input := "# This is a short line"
+	result := formatter.wrapLine(input)
+
+	if strings.Contains(result, "\n") {
+		t.Errorf("Short line should not be wrapped, got:\n%s", result)
+	}
+
+	if result != input {
+		t.Errorf("Short line should be unchanged, got:\n%s", result)
+	}
+}
+
+// TestWrapLineSpecialCharacters tests wrapping with special characters
+func TestWrapLineSpecialCharacters(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "Hyphens and dashes",
+			input: "# This-word contains-hyphens and — em-dashes in content",
+		},
+		{
+			name:  "Parentheses",
+			input: "# This (contains) some [brackets] and {braces} here",
+		},
+		{
+			name:  "Punctuation",
+			input: "# Hello! How are you? I'm fine, thanks. End.",
+		},
+		{
+			name:  "Math symbols",
+			input: "# The formula is x > 5 && y < 10 || z == 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				LineWidth:     40,
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.wrapLine(tt.input)
+
+			if result == "" {
+				t.Error("Expected non-empty result")
+			}
+
+			// Verify prefix is present
+			if !strings.HasPrefix(result, "# ") {
+				t.Errorf("Result should start with prefix, got: %q", result)
+			}
+		})
+	}
+}
+
+// TestWrapLineConsecutiveWhitespace tests handling of consecutive whitespace
+func TestWrapLineConsecutiveWhitespace(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "Multiple spaces between words",
+			input: "# word1    word2    word3    word4",
+		},
+		{
+			name:  "Tabs between words",
+			input: "# word1\t\tword2\t\tword3",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				LineWidth:     40,
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.wrapLine(tt.input)
+
+			// Should handle whitespace without panicking
+			if result == "" && tt.input != "" {
+				t.Error("Expected non-empty result")
+			}
+		})
+	}
+}
+
+// BenchmarkWrapLineShort benchmarks wrapping short lines
+func BenchmarkWrapLineShort(b *testing.B) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		LineWidth:     80,
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "# This is a short line"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.wrapLine(input)
+	}
+}
+
+// BenchmarkWrapLineMedium benchmarks wrapping medium length lines
+func BenchmarkWrapLineMedium(b *testing.B) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		LineWidth:     80,
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "# " + strings.Repeat("word ", 20)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.wrapLine(input)
+	}
+}
+
+// BenchmarkWrapLineLong benchmarks wrapping long lines
+func BenchmarkWrapLineLong(b *testing.B) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		LineWidth:     80,
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "# " + strings.Repeat("word ", 100)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.wrapLine(input)
+	}
+}
+
+// BenchmarkWrapLineVeryLong benchmarks wrapping very long lines
+func BenchmarkWrapLineVeryLong(b *testing.B) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		LineWidth:     80,
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "# " + strings.Repeat("word ", 500)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.wrapLine(input)
+	}
+}
+
+// BenchmarkWrapLineWithLongWords benchmarks wrapping lines with long words
+func BenchmarkWrapLineWithLongWords(b *testing.B) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		LineWidth:     80,
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "# " + strings.Repeat("verylongwordwithoutbreaks ", 20)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.wrapLine(input)
+	}
+}
