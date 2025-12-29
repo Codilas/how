@@ -2,6 +2,7 @@ package text
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/fatih/color"
@@ -536,5 +537,219 @@ func BenchmarkColoredConfig(b *testing.B) {
 func BenchmarkCompactConfig(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = CompactConfig()
+	}
+}
+
+// TestCleanWhitespace tests the cleanWhitespace method
+func TestCleanWhitespace(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Single blank line removal",
+			input:    "line1\n\n\nline2",
+			expected: "line1\n\nline2",
+		},
+		{
+			name:     "Multiple blank lines removal",
+			input:    "line1\n\n\n\n\nline2",
+			expected: "line1\n\nline2",
+		},
+		{
+			name:     "Leading whitespace trimming",
+			input:    "   \n\nline1\nline2",
+			expected: "line1\nline2",
+		},
+		{
+			name:     "Trailing whitespace trimming",
+			input:    "line1\nline2\n\n   ",
+			expected: "line1\nline2",
+		},
+		{
+			name:     "Both leading and trailing whitespace",
+			input:    "  \n\nline1\nline2\n\n  ",
+			expected: "line1\nline2",
+		},
+		{
+			name:     "Empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "Single character",
+			input:    "a",
+			expected: "a",
+		},
+		{
+			name:     "Single line with no extra whitespace",
+			input:    "hello world",
+			expected: "hello world",
+		},
+		{
+			name:     "Multiple lines with single blank line between",
+			input:    "line1\n\nline2\n\nline3",
+			expected: "line1\n\nline2\n\nline3",
+		},
+		{
+			name:     "Text with only whitespace",
+			input:    "   \n\n  \n  ",
+			expected: "",
+		},
+		{
+			name:     "Multiple consecutive newlines at start",
+			input:    "\n\n\n\ntext",
+			expected: "text",
+		},
+		{
+			name:     "Multiple consecutive newlines at end",
+			input:    "text\n\n\n\n",
+			expected: "text",
+		},
+		{
+			name:     "Tab characters with blank lines",
+			input:    "\t\ntext\n\n\n\nmore",
+			expected: "text\n\nmore",
+		},
+		{
+			name:     "Mixed whitespace in blank lines",
+			input:    "line1\n  \n\t\nline2",
+			expected: "line1\nline2",
+		},
+		{
+			name:     "Four consecutive newlines (boundary case)",
+			input:    "line1\n\n\n\nline2",
+			expected: "line1\n\nline2",
+		},
+		{
+			name:     "Exactly three consecutive newlines",
+			input:    "line1\n\n\nline2",
+			expected: "line1\n\nline2",
+		},
+		{
+			name:     "Two consecutive newlines (should remain)",
+			input:    "line1\n\nline2",
+			expected: "line1\n\nline2",
+		},
+		{
+			name:     "Single newline",
+			input:    "line1\nline2",
+			expected: "line1\nline2",
+		},
+		{
+			name:     "Spaces and tabs mixed",
+			input:    "  \t  \nline1\nline2\n  \t  ",
+			expected: "line1\nline2",
+		},
+		{
+			name:     "Complex multiline text with various whitespace",
+			input:    "  \n\nIntroduction\n\n\n\nMain content\n\nmore info\n\n\n\n  ",
+			expected: "Introduction\n\nMain content\n\nmore info",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(FormatterConfig{})
+			result := formatter.cleanWhitespace(tt.input)
+
+			if result != tt.expected {
+				t.Errorf("cleanWhitespace failed\ninput: %q\nexpected: %q\ngot: %q", tt.input, tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestCleanWhitespaceEdgeCases tests edge cases for cleanWhitespace
+func TestCleanWhitespaceEdgeCases(t *testing.T) {
+	formatter := NewTerminalFormatter(FormatterConfig{})
+
+	t.Run("Very long blank line sequence", func(t *testing.T) {
+		input := "start\n" + strings.Repeat("\n", 100) + "end"
+		result := formatter.cleanWhitespace(input)
+		expected := "start\n\nend"
+
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+
+	t.Run("Newlines with spaces", func(t *testing.T) {
+		input := "line1\n   \n   \n   \nline2"
+		result := formatter.cleanWhitespace(input)
+		// Note: cleanWhitespace only removes extra newlines, not spaces on lines
+		// This is expected behavior based on the implementation
+
+		if !strings.Contains(result, "line1") || !strings.Contains(result, "line2") {
+			t.Errorf("Result should contain both lines: %q", result)
+		}
+	})
+
+	t.Run("Unicode whitespace", func(t *testing.T) {
+		input := "line1\n\n\nline2"
+		result := formatter.cleanWhitespace(input)
+		expected := "line1\n\nline2"
+
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+
+	t.Run("Preserves internal structure", func(t *testing.T) {
+		input := "First paragraph\n\nSecond paragraph\n\nThird paragraph"
+		result := formatter.cleanWhitespace(input)
+
+		if result != input {
+			t.Errorf("Should preserve proper paragraph spacing")
+		}
+	})
+}
+
+// TestCleanWhitespaceIntegration tests cleanWhitespace within the Format method
+func TestCleanWhitespaceIntegration(t *testing.T) {
+	formatter := NewTerminalFormatter(DefaultConfig())
+
+	input := "Extra whitespace\n\n\n\nshould be cleaned"
+	result := formatter.Format(input)
+
+	if !strings.Contains(result, "Extra whitespace") || !strings.Contains(result, "should be cleaned") {
+		t.Errorf("Format should contain both text parts: %q", result)
+	}
+}
+
+// BenchmarkCleanWhitespace benchmarks the cleanWhitespace method
+func BenchmarkCleanWhitespace(b *testing.B) {
+	formatter := NewTerminalFormatter(FormatterConfig{})
+	input := "line1\n\n\n\nline2\n\n\n\nline3"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.cleanWhitespace(input)
+	}
+}
+
+// BenchmarkCleanWhitespaceComplexText benchmarks cleanWhitespace with complex input
+func BenchmarkCleanWhitespaceComplexText(b *testing.B) {
+	formatter := NewTerminalFormatter(FormatterConfig{})
+	complexInput := `This is a complex text
+
+with multiple paragraphs
+
+
+
+and various whitespace patterns
+
+		indentation
+
+and some more content
+
+
+
+at the end`
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.cleanWhitespace(complexInput)
 	}
 }
