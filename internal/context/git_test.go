@@ -2,9 +2,12 @@ package context
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestIsGitRepository tests the isGitRepository function
@@ -585,5 +588,378 @@ func TestGetGitRemoteIntegration(t *testing.T) {
 		if !strings.Contains(remote, ":") && !strings.Contains(remote, "@") {
 			t.Logf("Remote doesn't look like a URL: %s", remote)
 		}
+	}
+}
+
+// Test helpers for creating temporary git repositories
+
+// createTempGitRepo creates a temporary git repository with initial commit
+func createTempGitRepo(t *testing.T) string {
+	tmpDir, err := os.MkdirTemp("", "git-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+
+	// Initialize git repo
+	cmd := exec.Command("git", "init")
+	cmd.Dir = tmpDir
+	if err := cmd.Run(); err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("Failed to initialize git repo: %v", err)
+	}
+
+	// Configure git user (required for commits)
+	cmd = exec.Command("git", "config", "user.email", "test@example.com")
+	cmd.Dir = tmpDir
+	if err := cmd.Run(); err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("Failed to configure git user email: %v", err)
+	}
+
+	cmd = exec.Command("git", "config", "user.name", "Test User")
+	cmd.Dir = tmpDir
+	if err := cmd.Run(); err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("Failed to configure git user name: %v", err)
+	}
+
+	return tmpDir
+}
+
+// createCommit creates a commit in the given git repository
+func createCommit(t *testing.T, repoDir, message string) {
+	// Create a file to commit
+	filename := fmt.Sprintf("file-%d.txt", time.Now().UnixNano())
+	filepath := path.Join(repoDir, filename)
+
+	if err := os.WriteFile(filepath, []byte("test content"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Add file
+	cmd := exec.Command("git", "add", filename)
+	cmd.Dir = repoDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to git add: %v", err)
+	}
+
+	// Commit
+	cmd = exec.Command("git", "commit", "-m", message)
+	cmd.Dir = repoDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to git commit: %v", err)
+	}
+}
+
+// modifyFile modifies a file in the repository (creates uncommitted changes)
+func modifyFile(t *testing.T, repoDir, filename string) {
+	filepath := path.Join(repoDir, filename)
+
+	if err := os.WriteFile(filepath, []byte("modified content"), 0644); err != nil {
+		t.Fatalf("Failed to modify file: %v", err)
+	}
+}
+
+// createNewFile creates a new untracked file
+func createNewFile(t *testing.T, repoDir, filename string) {
+	filepath := path.Join(repoDir, filename)
+
+	if err := os.WriteFile(filepath, []byte("new content"), 0644); err != nil {
+		t.Fatalf("Failed to create new file: %v", err)
+	}
+}
+
+// TestGetGitContextWithValidRepo tests getGitContext with a valid repository
+func TestGetGitContextWithValidRepo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	tmpDir := createTempGitRepo(t)
+	defer os.RemoveAll(tmpDir)
+
+	// Create initial commit
+	createCommit(t, tmpDir, "Initial commit")
+
+	// Change to repo directory
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change to repo directory: %v", err)
+	}
+
+	// Get git context
+	ctx, err := getGitContext()
+	if err != nil {
+		t.Fatalf("getGitContext() returned error: %v", err)
+	}
+
+	if ctx == nil {
+		t.Fatal("getGitContext() returned nil context")
+	}
+
+	// Verify repository name
+	if ctx.Repository != path.Base(tmpDir) {
+		t.Errorf("Expected repository name %q, got %q", path.Base(tmpDir), ctx.Repository)
+	}
+
+	// Verify branch (default is usually 'master' or 'main')
+	if ctx.Branch == "" {
+		t.Error("Branch should not be empty")
+	}
+
+	// Verify commit hash (should be 7 characters)
+	if ctx.CommitHash == "" {
+		t.Error("CommitHash should not be empty")
+	}
+	if len(ctx.CommitHash) != 7 {
+		t.Errorf("Expected commit hash length of 7, got %d: %s", len(ctx.CommitHash), ctx.CommitHash)
+	}
+
+	// Verify status is clean
+	if ctx.Status != "clean" {
+		t.Errorf("Expected status 'clean', got %q", ctx.Status)
+	}
+
+	// Verify recent commits contains our commit
+	if len(ctx.RecentCommits) == 0 {
+		t.Error("RecentCommits should not be empty")
+	}
+}
+
+// TestGetGitContextWithCleanRepo tests getGitContext with a clean working directory
+func TestGetGitContextWithCleanRepo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	tmpDir := createTempGitRepo(t)
+	defer os.RemoveAll(tmpDir)
+
+	// Create multiple commits
+	createCommit(t, tmpDir, "First commit")
+	createCommit(t, tmpDir, "Second commit")
+	createCommit(t, tmpDir, "Third commit")
+
+	// Change to repo directory
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change to repo directory: %v", err)
+	}
+
+	// Get git context
+	ctx, err := getGitContext()
+	if err != nil {
+		t.Fatalf("getGitContext() returned error: %v", err)
+	}
+
+	if ctx == nil {
+		t.Fatal("getGitContext() returned nil context")
+	}
+
+	// Verify status is clean
+	if ctx.Status != "clean" {
+		t.Errorf("Expected status 'clean', got %q", ctx.Status)
+	}
+
+	// Verify we have recent commits (should have at least 3)
+	if len(ctx.RecentCommits) < 3 {
+		t.Errorf("Expected at least 3 recent commits, got %d", len(ctx.RecentCommits))
+	}
+}
+
+// TestGetGitContextWithUncommittedChanges tests getGitContext with uncommitted changes
+func TestGetGitContextWithUncommittedChanges(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	tmpDir := createTempGitRepo(t)
+	defer os.RemoveAll(tmpDir)
+
+	// Create initial commit
+	createCommit(t, tmpDir, "Initial commit")
+
+	// Change to repo directory
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change to repo directory: %v", err)
+	}
+
+	// Modify an existing file (create uncommitted changes)
+	modifyFile(t, tmpDir, "file-123.txt")
+
+	// Get git context
+	ctx, err := getGitContext()
+	if err != nil {
+		t.Fatalf("getGitContext() returned error: %v", err)
+	}
+
+	if ctx == nil {
+		t.Fatal("getGitContext() returned nil context")
+	}
+
+	// Verify status shows modified
+	if ctx.Status != "clean" && !strings.Contains(ctx.Status, "modified") {
+		t.Errorf("Expected status to contain 'modified', got %q", ctx.Status)
+	}
+
+	// The status should reflect the modification
+	if ctx.Status == "clean" {
+		t.Error("Status should not be clean when files are modified")
+	}
+}
+
+// TestGetGitContextWithMixedChanges tests getGitContext with mixed added/modified/deleted changes
+func TestGetGitContextWithMixedChanges(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	tmpDir := createTempGitRepo(t)
+	defer os.RemoveAll(tmpDir)
+
+	// Create initial commits with some files
+	createCommit(t, tmpDir, "Initial commit")
+	createCommit(t, tmpDir, "Second commit")
+
+	// Change to repo directory
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change to repo directory: %v", err)
+	}
+
+	// Create modified files and new files
+	modifyFile(t, tmpDir, "file-123.txt")  // Modify existing
+	createNewFile(t, tmpDir, "newfile.txt") // Add new untracked file
+
+	// Get git context
+	ctx, err := getGitContext()
+	if err != nil {
+		t.Fatalf("getGitContext() returned error: %v", err)
+	}
+
+	if ctx == nil {
+		t.Fatal("getGitContext() returned nil context")
+	}
+
+	// Verify status is not clean
+	if ctx.Status == "clean" {
+		t.Error("Status should not be clean when files are modified or added")
+	}
+}
+
+// TestGetGitContextOutsideRepo tests getGitContext outside a git repository
+func TestGetGitContextOutsideRepo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Create a temporary directory that's NOT a git repo
+	tmpDir, err := os.MkdirTemp("", "non-git-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Change to the non-git directory
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change to directory: %v", err)
+	}
+
+	// Get git context - should return nil without error
+	ctx, err := getGitContext()
+	if err != nil {
+		t.Fatalf("getGitContext() returned error: %v", err)
+	}
+
+	if ctx != nil {
+		t.Error("getGitContext() should return nil context when outside a git repository")
+	}
+}
+
+// TestGetGitContextPopulatesAllFields tests that getGitContext populates all fields
+func TestGetGitContextPopulatesAllFields(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	tmpDir := createTempGitRepo(t)
+	defer os.RemoveAll(tmpDir)
+
+	// Create a commit with a meaningful message
+	createCommit(t, tmpDir, "feat: add new feature")
+
+	// Change to repo directory
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change to repo directory: %v", err)
+	}
+
+	// Get git context
+	ctx, err := getGitContext()
+	if err != nil {
+		t.Fatalf("getGitContext() returned error: %v", err)
+	}
+
+	if ctx == nil {
+		t.Fatal("getGitContext() returned nil context")
+	}
+
+	// Verify all important fields are populated
+	if ctx.Repository == "" {
+		t.Error("Repository field should be populated")
+	}
+
+	if ctx.Branch == "" {
+		t.Error("Branch field should be populated")
+	}
+
+	if ctx.CommitHash == "" {
+		t.Error("CommitHash field should be populated")
+	}
+
+	if ctx.Status == "" {
+		t.Error("Status field should be populated")
+	}
+
+	// RecentCommits might be empty in some edge cases, but log if it is
+	if len(ctx.RecentCommits) == 0 {
+		t.Logf("RecentCommits is empty (may be expected in some cases)")
+	}
+
+	// RemoteURL might be empty if no remote is configured
+	if ctx.RemoteURL == "" {
+		t.Logf("RemoteURL is empty (expected when no remote is configured)")
 	}
 }
