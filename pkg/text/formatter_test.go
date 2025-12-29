@@ -3695,3 +3695,838 @@ func BenchmarkWriteTableLarge(b *testing.B) {
 		formatter.writeTable(&result, tableLines)
 	}
 }
+
+// ============================================================================
+// TESTS FOR highlightInlineCode METHOD
+// ============================================================================
+
+// TestHighlightInlineCodeBasic tests basic inline code highlighting
+func TestHighlightInlineCodeBasic(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		useColors     bool
+		shouldContain string
+		shouldNotContain string
+	}{
+		{
+			name:          "Single inline code with colors",
+			input:         "Use `variable` in your code",
+			useColors:     true,
+			shouldContain: "`variable`",
+		},
+		{
+			name:          "Single inline code without colors",
+			input:         "Use `variable` in your code",
+			useColors:     false,
+			shouldContain: "`variable`",
+		},
+		{
+			name:          "Multiple inline codes with colors",
+			input:         "Use `var1` and `var2` together",
+			useColors:     true,
+			shouldContain: "`var1`",
+		},
+		{
+			name:          "Inline code at start",
+			input:         "`start` of the line",
+			useColors:     false,
+			shouldContain: "`start`",
+		},
+		{
+			name:          "Inline code at end",
+			input:         "end with `code`",
+			useColors:     false,
+			shouldContain: "`code`",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     tt.useColors,
+				HighlightCode: true,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.highlightInlineCode(tt.input)
+
+			if !strings.Contains(result, tt.shouldContain) {
+				t.Errorf("Result should contain %q, got: %q", tt.shouldContain, result)
+			}
+
+			if tt.shouldNotContain != "" && strings.Contains(result, tt.shouldNotContain) {
+				t.Errorf("Result should not contain %q, got: %q", tt.shouldNotContain, result)
+			}
+		})
+	}
+}
+
+// TestHighlightInlineCodeBacktickDetection tests backtick detection
+func TestHighlightInlineCodeBacktickDetection(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		shouldHaveCode bool
+	}{
+		{
+			name:           "Valid single backtick pair",
+			input:          "text `code` more text",
+			shouldHaveCode: true,
+		},
+		{
+			name:           "Multiple backtick pairs",
+			input:          "`first` and `second` and `third`",
+			shouldHaveCode: true,
+		},
+		{
+			name:           "No backticks",
+			input:          "just plain text",
+			shouldHaveCode: false,
+		},
+		{
+			name:           "Single backtick without closing",
+			input:          "text with ` unclosed backtick",
+			shouldHaveCode: false,
+		},
+		{
+			name:           "Backticks with no content",
+			input:          "text with `` empty backticks",
+			shouldHaveCode: false,
+		},
+		{
+			name:           "Backtick with newline inside",
+			input:          "text with `code\nwith newline`",
+			shouldHaveCode: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				HighlightCode: true,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.highlightInlineCode(tt.input)
+
+			// If should have code, backticks should still be there
+			if tt.shouldHaveCode {
+				if !strings.Contains(result, "`") {
+					t.Errorf("Result should contain backticks for code, got: %q", result)
+				}
+			}
+		})
+	}
+}
+
+// TestHighlightInlineCodeWithColors tests color application to inline code
+func TestHighlightInlineCodeWithColors(t *testing.T) {
+	config := FormatterConfig{
+		UseColors:     true,
+		HighlightCode: true,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	input := "Use `variable` in your code"
+	result := formatter.highlightInlineCode(input)
+
+	// Result should contain the code
+	if !strings.Contains(result, "variable") {
+		t.Errorf("Result should contain 'variable', got: %q", result)
+	}
+
+	// When colors are enabled, output will have color codes
+	// We just verify it's not empty and contains the content
+	if result == "" {
+		t.Error("Result should not be empty with colors enabled")
+	}
+}
+
+// TestHighlightInlineCodeWithoutColors tests inline code without colors
+func TestHighlightInlineCodeWithoutColors(t *testing.T) {
+	config := FormatterConfig{
+		UseColors:     false,
+		HighlightCode: true,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	input := "Use `variable` in your code"
+	result := formatter.highlightInlineCode(input)
+
+	// Without colors, should return original input unchanged when colors disabled
+	if result != input {
+		t.Errorf("Without colors, should return input unchanged, got: %q", result)
+	}
+}
+
+// TestHighlightInlineCodeMultiple tests multiple inline codes in one line
+func TestHighlightInlineCodeMultiple(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		codeCount  int
+	}{
+		{
+			name:      "Two inline codes",
+			input:     "Use `var1` and `var2`",
+			codeCount: 2,
+		},
+		{
+			name:      "Three inline codes",
+			input:     "`first`, `second`, and `third`",
+			codeCount: 3,
+		},
+		{
+			name:      "Four inline codes with text between",
+			input:     "Code `a` then `b` also `c` finally `d`",
+			codeCount: 4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				HighlightCode: true,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.highlightInlineCode(tt.input)
+
+			// Count backticks in result (should be preserved)
+			backtickCount := strings.Count(result, "`")
+			expectedCount := tt.codeCount * 2 // opening and closing backticks
+
+			if backtickCount != expectedCount {
+				t.Errorf("Expected %d backticks, got %d in result: %q", expectedCount, backtickCount, result)
+			}
+		})
+	}
+}
+
+// TestHighlightInlineCodeEdgeCases tests edge cases
+func TestHighlightInlineCodeEdgeCases(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "Empty string",
+			input: "",
+		},
+		{
+			name:  "Only backticks",
+			input: "``",
+		},
+		{
+			name:  "Only text",
+			input: "just plain text",
+		},
+		{
+			name:  "Special characters in code",
+			input: "Use `$VAR` for variable",
+		},
+		{
+			name:  "Numbers in code",
+			input: "Call `func123` now",
+		},
+		{
+			name:  "Mixed case in code",
+			input: "Reference `MyClass` here",
+		},
+		{
+			name:  "Code with punctuation",
+			input: "Function `getName()` returns string",
+		},
+		{
+			name:  "Code with underscores",
+			input: "Use `my_function` for operations",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				HighlightCode: true,
+			}
+			formatter := NewTerminalFormatter(config)
+
+			// Should not panic
+			result := formatter.highlightInlineCode(tt.input)
+
+			// Should return something (might be same as input)
+			if result == "" && tt.input != "" {
+				t.Errorf("Expected non-empty result for input: %q", tt.input)
+			}
+		})
+	}
+}
+
+// TestHighlightInlineCodeConsecutive tests consecutive inline codes
+func TestHighlightInlineCodeConsecutive(t *testing.T) {
+	config := FormatterConfig{
+		UseColors:     false,
+		HighlightCode: true,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	input := "`code1``code2` text"
+	result := formatter.highlightInlineCode(input)
+
+	// Should preserve the input structure
+	if !strings.Contains(result, "code1") || !strings.Contains(result, "code2") {
+		t.Errorf("Result should contain both code sections, got: %q", result)
+	}
+}
+
+// TestHighlightInlineCodeWithSpaces tests inline codes with spaces
+func TestHighlightInlineCodeWithSpaces(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "Code with spaces",
+			input: "Use `my code` here",
+		},
+		{
+			name:  "Code with leading space",
+			input: "Call ` function` now",
+		},
+		{
+			name:  "Code with trailing space",
+			input: "Use `variable ` in code",
+		},
+		{
+			name:  "Code with multiple spaces",
+			input: "Function `my  code` works",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				HighlightCode: true,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.highlightInlineCode(tt.input)
+
+			// Should preserve the content
+			if result == "" {
+				t.Error("Result should not be empty")
+			}
+		})
+	}
+}
+
+// ============================================================================
+// TESTS FOR formatTextLine METHOD
+// ============================================================================
+
+// TestFormatTextLineBasic tests basic text line formatting
+func TestFormatTextLineBasic(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		config        FormatterConfig
+		shouldContain string
+	}{
+		{
+			name:   "Plain text line",
+			input:  "This is plain text",
+			config: FormatterConfig{CommentPrefix: "# "},
+			shouldContain: "This is plain text",
+		},
+		{
+			name:   "Text with inline code",
+			input:  "Use `variable` here",
+			config: FormatterConfig{CommentPrefix: "# ", HighlightCode: true, UseColors: true},
+			shouldContain: "variable",
+		},
+		{
+			name:   "Empty line",
+			input:  "",
+			config: FormatterConfig{CommentPrefix: "# "},
+			shouldContain: "# ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(tt.config)
+			result := formatter.formatTextLine(tt.input)
+
+			if !strings.Contains(result, tt.shouldContain) {
+				t.Errorf("Result should contain %q, got: %q", tt.shouldContain, result)
+			}
+		})
+	}
+}
+
+// TestFormatTextLineWithMarkdownHeaders tests header detection in formatTextLine
+func TestFormatTextLineWithMarkdownHeaders(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		parseMarkdown bool
+		shouldContain string
+	}{
+		{
+			name:          "H1 header with markdown parsing",
+			input:         "# Main Title",
+			parseMarkdown: true,
+			shouldContain: "Main Title",
+		},
+		{
+			name:          "H2 header with markdown parsing",
+			input:         "## Subtitle",
+			parseMarkdown: true,
+			shouldContain: "Subtitle",
+		},
+		{
+			name:          "H3 header with markdown parsing",
+			input:         "### Section",
+			parseMarkdown: true,
+			shouldContain: "Section",
+		},
+		{
+			name:          "H1 header without markdown parsing",
+			input:         "# Main Title",
+			parseMarkdown: false,
+			shouldContain: "# Main Title",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				ParseMarkdown: tt.parseMarkdown,
+				UseColors:     false,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatTextLine(tt.input)
+
+			if !strings.Contains(result, tt.shouldContain) {
+				t.Errorf("Result should contain %q, got: %q", tt.shouldContain, result)
+			}
+		})
+	}
+}
+
+// TestFormatTextLineWithBlockQuotes tests block quote detection
+func TestFormatTextLineWithBlockQuotes(t *testing.T) {
+	tests := []struct {
+		name              string
+		input             string
+		highlightQuotes   bool
+		shouldContain     string
+	}{
+		{
+			name:            "Block quote with highlighting",
+			input:           "> This is a quote",
+			highlightQuotes: true,
+			shouldContain:   "This is a quote",
+		},
+		{
+			name:            "Block quote without highlighting",
+			input:           "> This is a quote",
+			highlightQuotes: false,
+			shouldContain:   "> This is a quote",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix:  "# ",
+				HighlightQuotes: tt.highlightQuotes,
+				UseColors:       false,
+				IndentSize:      2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatTextLine(tt.input)
+
+			if !strings.Contains(result, tt.shouldContain) {
+				t.Errorf("Result should contain %q, got: %q", tt.shouldContain, result)
+			}
+		})
+	}
+}
+
+// TestFormatTextLineWithListItems tests list item detection
+func TestFormatTextLineWithListItems(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		useBullets    bool
+		shouldContain string
+	}{
+		{
+			name:          "Bullet list with bullets enabled",
+			input:         "- Item one",
+			useBullets:    true,
+			shouldContain: "Item one",
+		},
+		{
+			name:          "Bullet list with bullets disabled",
+			input:         "- Item one",
+			useBullets:    false,
+			shouldContain: "- Item one",
+		},
+		{
+			name:          "Numbered list with bullets enabled",
+			input:         "1. First item",
+			useBullets:    true,
+			shouldContain: "First item",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				UseBullets:    tt.useBullets,
+				UseColors:     false,
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatTextLine(tt.input)
+
+			if !strings.Contains(result, tt.shouldContain) {
+				t.Errorf("Result should contain %q, got: %q", tt.shouldContain, result)
+			}
+		})
+	}
+}
+
+// TestFormatTextLineInteractionWithInlineCode tests interaction between inline code and other formatting
+func TestFormatTextLineInteractionWithInlineCode(t *testing.T) {
+	tests := []struct {
+		name              string
+		input             string
+		highlightCode     bool
+		parseMarkdown     bool
+		shouldContain     []string
+	}{
+		{
+			name:          "Inline code with bold",
+			input:         "Use **`important_var`** here",
+			highlightCode: true,
+			parseMarkdown: true,
+			shouldContain: []string{"important_var"},
+		},
+		{
+			name:          "Inline code with italic",
+			input:         "The *`special_code`* here",
+			highlightCode: true,
+			parseMarkdown: true,
+			shouldContain: []string{"special_code"},
+		},
+		{
+			name:          "Multiple code with formatting",
+			input:         "Use `first` and **`second`** or *`third`*",
+			highlightCode: true,
+			parseMarkdown: true,
+			shouldContain: []string{"first", "second", "third"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				HighlightCode: tt.highlightCode,
+				ParseMarkdown: tt.parseMarkdown,
+				UseColors:     true,
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatTextLine(tt.input)
+
+			for _, expected := range tt.shouldContain {
+				if !strings.Contains(result, expected) {
+					t.Errorf("Result should contain %q, got: %q", expected, result)
+				}
+			}
+		})
+	}
+}
+
+// TestFormatTextLineWithCommentPrefix tests comment prefix application
+func TestFormatTextLineWithCommentPrefix(t *testing.T) {
+	tests := []struct {
+		name   string
+		prefix string
+	}{
+		{"Hash prefix", "# "},
+		{"Arrow prefix", ">> "},
+		{"Colon prefix", ": "},
+		{"Empty prefix", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: tt.prefix,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatTextLine("Test line")
+
+			if tt.prefix != "" {
+				if !strings.HasPrefix(result, tt.prefix) {
+					t.Errorf("Result should start with %q, got: %q", tt.prefix, result)
+				}
+			}
+		})
+	}
+}
+
+// TestFormatTextLineInlineCodeDetection tests inline code backtick detection in formatTextLine
+func TestFormatTextLineInlineCodeDetection(t *testing.T) {
+	tests := []struct {
+		name                string
+		input               string
+		highlightCode       bool
+		expectBacktickCount int
+	}{
+		{
+			name:                "Single inline code",
+			input:               "Use `variable` here",
+			highlightCode:       true,
+			expectBacktickCount: 2,
+		},
+		{
+			name:                "Multiple inline codes",
+			input:               "Use `var1` and `var2`",
+			highlightCode:       true,
+			expectBacktickCount: 4,
+		},
+		{
+			name:                "No inline code",
+			input:               "Plain text without code",
+			highlightCode:       true,
+			expectBacktickCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				HighlightCode: tt.highlightCode,
+				UseColors:     true,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatTextLine(tt.input)
+
+			backtickCount := strings.Count(result, "`")
+			if backtickCount != tt.expectBacktickCount {
+				t.Errorf("Expected %d backticks, got %d in result: %q", tt.expectBacktickCount, backtickCount, result)
+			}
+		})
+	}
+}
+
+// TestFormatTextLineLongLine tests long line handling
+func TestFormatTextLineLongLine(t *testing.T) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		LineWidth:     40,
+		WrapLongLines: true,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	longLine := "This is a very long line that should be wrapped because it exceeds the configured line width"
+	result := formatter.formatTextLine(longLine)
+
+	// Result should have the content
+	if !strings.Contains(result, "long line") {
+		t.Errorf("Result should contain the original content, got: %q", result)
+	}
+}
+
+// TestFormatTextLineComplexFormatting tests complex formatting interactions
+func TestFormatTextLineComplexFormatting(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		config FormatterConfig
+	}{
+		{
+			name:  "Code with markdown in markdown mode",
+			input: "Check `my_func()` or **bold** or *italic*",
+			config: FormatterConfig{
+				CommentPrefix: "# ",
+				ParseMarkdown: true,
+				HighlightCode: true,
+				UseColors:     true,
+				IndentSize:    2,
+			},
+		},
+		{
+			name:  "All features enabled",
+			input: "# Header with `code` and **bold**",
+			config: FormatterConfig{
+				CommentPrefix:  "# ",
+				ParseMarkdown:   true,
+				HighlightCode:   true,
+				UseColors:       true,
+				IndentSize:      2,
+				WrapLongLines:   true,
+				HighlightQuotes: true,
+				UseBullets:      true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(tt.config)
+
+			// Should not panic with complex input
+			result := formatter.formatTextLine(tt.input)
+
+			if result == "" {
+				t.Error("Result should not be empty")
+			}
+		})
+	}
+}
+
+// ============================================================================
+// BENCHMARK TESTS FOR highlightInlineCode AND formatTextLine
+// ============================================================================
+
+// BenchmarkHighlightInlineCodeSimple benchmarks highlightInlineCode with simple input
+func BenchmarkHighlightInlineCodeSimple(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     true,
+		HighlightCode: true,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "Use `variable` in your code"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.highlightInlineCode(input)
+	}
+}
+
+// BenchmarkHighlightInlineCodeMultiple benchmarks with multiple inline codes
+func BenchmarkHighlightInlineCodeMultiple(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     true,
+		HighlightCode: true,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "Use `var1` and `var2` and `var3` and `var4` in your code"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.highlightInlineCode(input)
+	}
+}
+
+// BenchmarkHighlightInlineCodeComplex benchmarks with complex text
+func BenchmarkHighlightInlineCodeComplex(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     true,
+		HighlightCode: true,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := `The function getValue() returns the value, stored in \`myVar\`.
+	Use \`getValue()\` to fetch it. Alternative: \`getVal()\` is deprecated.`
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.highlightInlineCode(input)
+	}
+}
+
+// BenchmarkHighlightInlineCodeNoMatch benchmarks with no inline codes
+func BenchmarkHighlightInlineCodeNoMatch(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     true,
+		HighlightCode: true,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "Plain text without any inline code formatting"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.highlightInlineCode(input)
+	}
+}
+
+// BenchmarkFormatTextLineSimple benchmarks formatTextLine with simple input
+func BenchmarkFormatTextLineSimple(b *testing.B) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "This is a simple text line"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.formatTextLine(input)
+	}
+}
+
+// BenchmarkFormatTextLineWithMarkdown benchmarks with markdown formatting
+func BenchmarkFormatTextLineWithMarkdown(b *testing.B) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		ParseMarkdown: true,
+		UseColors:     true,
+		HighlightCode: true,
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "# Header with `code` and **bold** and *italic*"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.formatTextLine(input)
+	}
+}
+
+// BenchmarkFormatTextLineComplex benchmarks with complex formatting
+func BenchmarkFormatTextLineComplex(b *testing.B) {
+	config := FormatterConfig{
+		CommentPrefix:   "# ",
+		ParseMarkdown:    true,
+		UseColors:        true,
+		HighlightCode:    true,
+		IndentSize:       2,
+		WrapLongLines:    true,
+		HighlightQuotes:  true,
+		UseBullets:       true,
+		LineWidth:        80,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "Use `myFunction()` for operations with **important** data in *context*, see > quote"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.formatTextLine(input)
+	}
+}
+
+// BenchmarkFormatTextLineListItem benchmarks with list item
+func BenchmarkFormatTextLineListItem(b *testing.B) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		UseBullets:    true,
+		UseColors:     false,
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "- This is a list item with `code` in it"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.formatTextLine(input)
+	}
+}
