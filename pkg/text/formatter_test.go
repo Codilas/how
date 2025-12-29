@@ -1760,3 +1760,1016 @@ func BenchmarkWriteCodeBlockWithColors(b *testing.B) {
 		formatter.writeCodeBlock(&result, code, "javascript")
 	}
 }
+
+// ============================================================================
+// TESTS FOR formatHeading METHOD
+// ============================================================================
+
+// TestFormatHeadingH1 tests H1 heading formatting
+func TestFormatHeadingH1(t *testing.T) {
+	tests := []struct {
+		name           string
+		text           string
+		useColors      bool
+		shouldContain  string
+		shouldNotContain string
+	}{
+		{
+			name:          "H1 heading with colors",
+			text:          "Main Title",
+			useColors:     true,
+			shouldContain: "Main Title",
+		},
+		{
+			name:          "H1 heading without colors",
+			text:          "Main Title",
+			useColors:     false,
+			shouldContain: "MAIN TITLE",
+		},
+		{
+			name:          "H1 heading with special characters",
+			text:          "Title with **Bold** and *Italic*",
+			useColors:     false,
+			shouldContain: "TITLE",
+		},
+		{
+			name:          "H1 heading empty text",
+			text:          "",
+			useColors:     false,
+			shouldContain: "# ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     tt.useColors,
+				CommentPrefix: "# ",
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatHeading(tt.text, 1)
+
+			if !strings.Contains(result, tt.shouldContain) {
+				t.Errorf("H1 heading should contain %q, got: %q", tt.shouldContain, result)
+			}
+
+			if tt.shouldNotContain != "" && strings.Contains(result, tt.shouldNotContain) {
+				t.Errorf("H1 heading should not contain %q, got: %q", tt.shouldNotContain, result)
+			}
+
+			if !strings.HasPrefix(result, "# ") {
+				t.Errorf("H1 heading should have comment prefix, got: %q", result)
+			}
+		})
+	}
+}
+
+// TestFormatHeadingH2 tests H2 heading formatting
+func TestFormatHeadingH2(t *testing.T) {
+	tests := []struct {
+		name          string
+		text          string
+		useColors     bool
+		shouldContain string
+	}{
+		{
+			name:          "H2 heading with colors",
+			text:          "Subheading",
+			useColors:     true,
+			shouldContain: "Subheading",
+		},
+		{
+			name:          "H2 heading without colors",
+			text:          "Subheading",
+			useColors:     false,
+			shouldContain: "SUBHEADING",
+		},
+		{
+			name:          "H2 heading long text",
+			text:          "This is a longer subheading with more content",
+			useColors:     false,
+			shouldContain: "THIS IS A LONGER SUBHEADING",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     tt.useColors,
+				CommentPrefix: "# ",
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatHeading(tt.text, 2)
+
+			if !strings.Contains(result, tt.shouldContain) {
+				t.Errorf("H2 heading should contain %q, got: %q", tt.shouldContain, result)
+			}
+
+			if !strings.HasPrefix(result, "# ") {
+				t.Errorf("H2 heading should have comment prefix, got: %q", result)
+			}
+		})
+	}
+}
+
+// TestFormatHeadingH3 tests H3 heading formatting
+func TestFormatHeadingH3(t *testing.T) {
+	tests := []struct {
+		name          string
+		text          string
+		useColors     bool
+		shouldContain string
+	}{
+		{
+			name:          "H3 heading with colors",
+			text:          "Minor Heading",
+			useColors:     true,
+			shouldContain: "Minor Heading",
+		},
+		{
+			name:          "H3 heading without colors",
+			text:          "Minor Heading",
+			useColors:     false,
+			shouldContain: "MINOR HEADING",
+		},
+		{
+			name:          "H3 heading single word",
+			text:          "Heading",
+			useColors:     false,
+			shouldContain: "HEADING",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     tt.useColors,
+				CommentPrefix: "# ",
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatHeading(tt.text, 3)
+
+			if !strings.Contains(result, tt.shouldContain) {
+				t.Errorf("H3 heading should contain %q, got: %q", tt.shouldContain, result)
+			}
+
+			if !strings.HasPrefix(result, "# ") {
+				t.Errorf("H3 heading should have comment prefix, got: %q", result)
+			}
+		})
+	}
+}
+
+// TestFormatHeadingDefaultLevel tests heading formatting with default level
+func TestFormatHeadingDefaultLevel(t *testing.T) {
+	config := FormatterConfig{
+		UseColors:     false,
+		CommentPrefix: "# ",
+	}
+	formatter := NewTerminalFormatter(config)
+
+	// Level 4 should default to H3 behavior
+	result := formatter.formatHeading("Test", 4)
+	if !strings.Contains(result, "TEST") {
+		t.Errorf("Default level heading should contain uppercase text, got: %q", result)
+	}
+}
+
+// TestFormatHeadingWithCustomPrefix tests heading with different comment prefix
+func TestFormatHeadingWithCustomPrefix(t *testing.T) {
+	tests := []struct {
+		name   string
+		prefix string
+	}{
+		{"Hash prefix", "# "},
+		{"Arrow prefix", ">> "},
+		{"Colon prefix", ": "},
+		{"Empty prefix", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				CommentPrefix: tt.prefix,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatHeading("Text", 1)
+
+			if !strings.HasPrefix(result, tt.prefix) {
+				t.Errorf("Heading should start with prefix %q, got: %q", tt.prefix, result)
+			}
+		})
+	}
+}
+
+// ============================================================================
+// TESTS FOR formatBlockQuote METHOD
+// ============================================================================
+
+// TestFormatBlockQuoteBasic tests basic block quote formatting
+func TestFormatBlockQuoteBasic(t *testing.T) {
+	tests := []struct {
+		name          string
+		text          string
+		useColors     bool
+		shouldContain []string
+	}{
+		{
+			name:          "Simple block quote with colors",
+			text:          "This is a quote",
+			useColors:     true,
+			shouldContain: []string{"# ", "│ ", "This is a quote"},
+		},
+		{
+			name:          "Simple block quote without colors",
+			text:          "This is a quote",
+			useColors:     false,
+			shouldContain: []string{"# ", "> ", "This is a quote"},
+		},
+		{
+			name:          "Block quote with special characters",
+			text:          "Quote with \"quotes\" and 'apostrophes'",
+			useColors:     false,
+			shouldContain: []string{"> ", "quotes", "apostrophes"},
+		},
+		{
+			name:          "Block quote empty text",
+			text:          "",
+			useColors:     false,
+			shouldContain: []string{"# ", "> "},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     tt.useColors,
+				CommentPrefix: "# ",
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatBlockQuote(tt.text)
+
+			for _, expected := range tt.shouldContain {
+				if !strings.Contains(result, expected) {
+					t.Errorf("Block quote should contain %q, got: %q", expected, result)
+				}
+			}
+		})
+	}
+}
+
+// TestFormatBlockQuoteWithIndent tests block quote indentation
+func TestFormatBlockQuoteWithIndent(t *testing.T) {
+	tests := []struct {
+		name       string
+		indentSize int
+		shouldMatch string
+	}{
+		{
+			name:        "2-space indent",
+			indentSize:  2,
+			shouldMatch: "  ",
+		},
+		{
+			name:        "4-space indent",
+			indentSize:  4,
+			shouldMatch: "    ",
+		},
+		{
+			name:        "No indent",
+			indentSize:  0,
+			shouldMatch: "> ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				CommentPrefix: "# ",
+				IndentSize:    tt.indentSize,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatBlockQuote("quote text")
+
+			if tt.indentSize > 0 {
+				expectedIndent := strings.Repeat(" ", tt.indentSize)
+				if !strings.Contains(result, expectedIndent) {
+					t.Errorf("Block quote should contain %d space indent, got: %q", tt.indentSize, result)
+				}
+			}
+
+			if !strings.Contains(result, "quote text") {
+				t.Errorf("Block quote should contain quote text, got: %q", result)
+			}
+		})
+	}
+}
+
+// TestFormatBlockQuoteMultilineSupport tests that block quote handles full lines
+func TestFormatBlockQuoteMultilineSupport(t *testing.T) {
+	config := FormatterConfig{
+		UseColors:     false,
+		CommentPrefix: "# ",
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	tests := []struct {
+		name string
+		text string
+	}{
+		{"Single line", "This is a single line quote"},
+		{"With numbers", "Quote 123 with numbers 456"},
+		{"With punctuation", "Quote! How are you? Well, I'm fine."},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatter.formatBlockQuote(tt.text)
+
+			if !strings.Contains(result, tt.text) {
+				t.Errorf("Block quote should preserve text, got: %q", result)
+			}
+
+			if !strings.Contains(result, "# ") {
+				t.Errorf("Block quote should have comment prefix, got: %q", result)
+			}
+		})
+	}
+}
+
+// ============================================================================
+// TESTS FOR formatListItem METHOD
+// ============================================================================
+
+// TestFormatListItemBulletList tests bullet list item formatting
+func TestFormatListItemBulletList(t *testing.T) {
+	tests := []struct {
+		name          string
+		marker        string
+		text          string
+		useColors     bool
+		shouldContain []string
+	}{
+		{
+			name:          "Dash bullet with colors",
+			marker:        "-",
+			text:          "First item",
+			useColors:     true,
+			shouldContain: []string{"•", "First item", "# "},
+		},
+		{
+			name:          "Dash bullet without colors",
+			marker:        "-",
+			text:          "First item",
+			useColors:     false,
+			shouldContain: []string{"•", "First item", "# "},
+		},
+		{
+			name:          "Star bullet",
+			marker:        "*",
+			text:          "Second item",
+			useColors:     false,
+			shouldContain: []string{"•", "Second item"},
+		},
+		{
+			name:          "Plus bullet",
+			marker:        "+",
+			text:          "Third item",
+			useColors:     false,
+			shouldContain: []string{"•", "Third item"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     tt.useColors,
+				CommentPrefix: "# ",
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatListItem("", tt.marker, tt.text)
+
+			for _, expected := range tt.shouldContain {
+				if !strings.Contains(result, expected) {
+					t.Errorf("List item should contain %q, got: %q", expected, result)
+				}
+			}
+		})
+	}
+}
+
+// TestFormatListItemNumberedList tests numbered list item formatting
+func TestFormatListItemNumberedList(t *testing.T) {
+	tests := []struct {
+		name          string
+		marker        string
+		text          string
+		shouldContain string
+	}{
+		{
+			name:          "First item",
+			marker:        "1.",
+			text:          "First item",
+			shouldContain: "1.",
+		},
+		{
+			name:          "Second item",
+			marker:        "2.",
+			text:          "Second item",
+			shouldContain: "2.",
+		},
+		{
+			name:          "Double digit",
+			marker:        "10.",
+			text:          "Tenth item",
+			shouldContain: "10.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				CommentPrefix: "# ",
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatListItem("", tt.marker, tt.text)
+
+			if !strings.Contains(result, tt.shouldContain) {
+				t.Errorf("Numbered list should contain %q, got: %q", tt.shouldContain, result)
+			}
+
+			if !strings.Contains(result, tt.text) {
+				t.Errorf("List item should contain text %q, got: %q", tt.text, result)
+			}
+		})
+	}
+}
+
+// TestFormatListItemIndentation tests list item indentation
+func TestFormatListItemIndentation(t *testing.T) {
+	tests := []struct {
+		name       string
+		indentStr  string
+		indentSize int
+	}{
+		{
+			name:       "No additional indent",
+			indentStr:  "",
+			indentSize: 2,
+		},
+		{
+			name:       "With additional indent",
+			indentStr:  "  ",
+			indentSize: 2,
+		},
+		{
+			name:       "Nested indent",
+			indentStr:  "    ",
+			indentSize: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				CommentPrefix: "# ",
+				IndentSize:    tt.indentSize,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatListItem(tt.indentStr, "-", "Item")
+
+			if !strings.Contains(result, "Item") {
+				t.Errorf("List item should contain text, got: %q", result)
+			}
+
+			if !strings.Contains(result, "•") {
+				t.Errorf("List item should contain bullet, got: %q", result)
+			}
+		})
+	}
+}
+
+// TestFormatListItemWithColors tests list item with color formatting
+func TestFormatListItemWithColors(t *testing.T) {
+	config := FormatterConfig{
+		UseColors:     true,
+		CommentPrefix: "# ",
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+	result := formatter.formatListItem("", "-", "Item with colors")
+
+	// With colors enabled, we should still have the structure
+	if !strings.Contains(result, "Item with colors") {
+		t.Errorf("List item should contain text, got: %q", result)
+	}
+
+	if !strings.Contains(result, "# ") {
+		t.Errorf("List item should have comment prefix, got: %q", result)
+	}
+}
+
+// TestFormatListItemComplexText tests list item with complex text
+func TestFormatListItemComplexText(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+	}{
+		{"Text with numbers", "Item 123 with numbers"},
+		{"Text with special chars", "Item with (parentheses) and [brackets]"},
+		{"Text with symbols", "Item with $dollar and #hash symbols"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				CommentPrefix: "# ",
+				IndentSize:    2,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.formatListItem("", "-", tt.text)
+
+			if !strings.Contains(result, tt.text) {
+				t.Errorf("List item should preserve complex text, got: %q", result)
+			}
+		})
+	}
+}
+
+// ============================================================================
+// TESTS FOR applyInlineFormatting METHOD
+// ============================================================================
+
+// TestApplyInlineFormattingBold tests bold text formatting
+func TestApplyInlineFormattingBold(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		useColors     bool
+		shouldContain string
+	}{
+		{
+			name:          "Simple bold with colors",
+			input:         "This is **bold** text",
+			useColors:     true,
+			shouldContain: "bold",
+		},
+		{
+			name:          "Simple bold without colors",
+			input:         "This is **bold** text",
+			useColors:     false,
+			shouldContain: "BOLD",
+		},
+		{
+			name:          "Multiple bold words",
+			input:         "**first** and **second** bold",
+			useColors:     false,
+			shouldContain: "FIRST",
+		},
+		{
+			name:          "Bold at start",
+			input:         "**Start** with bold",
+			useColors:     false,
+			shouldContain: "START",
+		},
+		{
+			name:          "Bold at end",
+			input:         "End with **bold**",
+			useColors:     false,
+			shouldContain: "BOLD",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     tt.useColors,
+				ParseMarkdown: true,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.applyInlineFormatting(tt.input)
+
+			if !strings.Contains(result, tt.shouldContain) {
+				t.Errorf("Bold formatting should contain %q, got: %q", tt.shouldContain, result)
+			}
+
+			// Should not contain the markdown markers
+			if strings.Contains(result, "**") {
+				t.Errorf("Bold formatting should remove ** markers, got: %q", result)
+			}
+		})
+	}
+}
+
+// TestApplyInlineFormattingItalic tests italic text formatting
+func TestApplyInlineFormattingItalic(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		useColors     bool
+		shouldContain string
+	}{
+		{
+			name:          "Simple italic with colors",
+			input:         "This is *italic* text",
+			useColors:     true,
+			shouldContain: "italic",
+		},
+		{
+			name:          "Simple italic without colors",
+			input:         "This is *italic* text",
+			useColors:     false,
+			shouldContain: "_italic_",
+		},
+		{
+			name:          "Multiple italic words",
+			input:         "*first* and *second* italic",
+			useColors:     false,
+			shouldContain: "_first_",
+		},
+		{
+			name:          "Italic at start",
+			input:         "*Start* with italic",
+			useColors:     false,
+			shouldContain: "_Start_",
+		},
+		{
+			name:          "Italic at end",
+			input:         "End with *italic*",
+			useColors:     false,
+			shouldContain: "_italic_",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     tt.useColors,
+				ParseMarkdown: true,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.applyInlineFormatting(tt.input)
+
+			if !strings.Contains(result, tt.shouldContain) {
+				t.Errorf("Italic formatting should contain %q, got: %q", tt.shouldContain, result)
+			}
+		})
+	}
+}
+
+// TestApplyInlineFormattingLinks tests link formatting
+func TestApplyInlineFormattingLinks(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		useColors     bool
+		shouldContain []string
+	}{
+		{
+			name:          "Simple link with colors",
+			input:         "Visit [Google](https://google.com)",
+			useColors:     true,
+			shouldContain: []string{"Google", "https://google.com"},
+		},
+		{
+			name:          "Simple link without colors",
+			input:         "Visit [Google](https://google.com)",
+			useColors:     false,
+			shouldContain: []string{"Google", "https://google.com"},
+		},
+		{
+			name:          "Multiple links",
+			input:         "[Link1](url1) and [Link2](url2)",
+			useColors:     false,
+			shouldContain: []string{"Link1", "Link2", "url1", "url2"},
+		},
+		{
+			name:          "Link in sentence",
+			input:         "Check [this link](http://example.com) for more info",
+			useColors:     false,
+			shouldContain: []string{"this link", "http://example.com"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     tt.useColors,
+				ParseMarkdown: true,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.applyInlineFormatting(tt.input)
+
+			for _, expected := range tt.shouldContain {
+				if !strings.Contains(result, expected) {
+					t.Errorf("Link formatting should contain %q, got: %q", expected, result)
+				}
+			}
+
+			// Should not contain markdown link syntax
+			if strings.Contains(result, "[") && strings.Contains(result, "](") {
+				t.Errorf("Link formatting should remove markdown syntax, got: %q", result)
+			}
+		})
+	}
+}
+
+// TestApplyInlineFormattingCombined tests combined inline formatting
+func TestApplyInlineFormattingCombined(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		useColors     bool
+		shouldContain []string
+	}{
+		{
+			name:          "Bold and italic combined",
+			input:         "This has **bold** and *italic* together",
+			useColors:     false,
+			shouldContain: []string{"BOLD", "_italic_", "This has", "together"},
+		},
+		{
+			name:          "Bold, italic, and link",
+			input:         "**bold** [link](url) and *italic*",
+			useColors:     false,
+			shouldContain: []string{"BOLD", "link", "url", "_italic_"},
+		},
+		{
+			name:          "Multiple of each format",
+			input:         "**bold1** *italic1* [link1](url1) **bold2** *italic2*",
+			useColors:     false,
+			shouldContain: []string{"BOLD1", "BOLD2", "_italic1_", "link1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     tt.useColors,
+				ParseMarkdown: true,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.applyInlineFormatting(tt.input)
+
+			for _, expected := range tt.shouldContain {
+				if !strings.Contains(result, expected) {
+					t.Errorf("Combined formatting should contain %q, got: %q", expected, result)
+				}
+			}
+		})
+	}
+}
+
+// TestApplyInlineFormattingEdgeCases tests edge cases
+func TestApplyInlineFormattingEdgeCases(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "Empty string",
+			input: "",
+		},
+		{
+			name:  "No formatting",
+			input: "Plain text without any formatting",
+		},
+		{
+			name:  "Unclosed bold",
+			input: "Text with **unclosed bold",
+		},
+		{
+			name:  "Unclosed italic",
+			input: "Text with *unclosed italic",
+		},
+		{
+			name:  "Malformed link",
+			input: "[text without closing bracket](url)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				ParseMarkdown: true,
+			}
+			formatter := NewTerminalFormatter(config)
+
+			// Should not panic
+			result := formatter.applyInlineFormatting(tt.input)
+
+			// Should return something
+			if result == "" && tt.input != "" {
+				t.Errorf("Formatting should not return empty for non-empty input, got: %q", result)
+			}
+		})
+	}
+}
+
+// TestApplyInlineFormattingPreservesNonMarkdown tests that non-markdown is preserved
+func TestApplyInlineFormattingPreservesNonMarkdown(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "Text with dollar signs",
+			input: "Price is $100 and $200",
+		},
+		{
+			name:  "Text with hash tags",
+			input: "Use #hashtag or #another",
+		},
+		{
+			name:  "Regular expression",
+			input: "[a-z]+\\.[a-z]+",
+		},
+		{
+			name:  "Code-like syntax",
+			input: "function(arg1, arg2) { return value; }",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				UseColors:     false,
+				ParseMarkdown: true,
+			}
+			formatter := NewTerminalFormatter(config)
+			result := formatter.applyInlineFormatting(tt.input)
+
+			// Most of the input should be preserved
+			if !strings.Contains(result, strings.ReplaceAll(tt.input, "*", "")) {
+				// Allow some transformation but should have most of the content
+				if len(result) < len(tt.input)/2 {
+					t.Errorf("Formatting should mostly preserve input, got: %q", result)
+				}
+			}
+		})
+	}
+}
+
+// ============================================================================
+// BENCHMARK TESTS FOR MARKDOWN FORMATTING METHODS
+// ============================================================================
+
+// BenchmarkFormatHeading benchmarks the formatHeading method
+func BenchmarkFormatHeading(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     false,
+		CommentPrefix: "# ",
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.formatHeading("Sample Heading Text", 1)
+	}
+}
+
+// BenchmarkFormatHeadingWithColors benchmarks formatHeading with colors
+func BenchmarkFormatHeadingWithColors(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     true,
+		CommentPrefix: "# ",
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.formatHeading("Sample Heading Text", 2)
+	}
+}
+
+// BenchmarkFormatBlockQuote benchmarks the formatBlockQuote method
+func BenchmarkFormatBlockQuote(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     false,
+		CommentPrefix: "# ",
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.formatBlockQuote("This is a sample block quote text")
+	}
+}
+
+// BenchmarkFormatBlockQuoteWithColors benchmarks formatBlockQuote with colors
+func BenchmarkFormatBlockQuoteWithColors(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     true,
+		CommentPrefix: "# ",
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.formatBlockQuote("This is a sample block quote text")
+	}
+}
+
+// BenchmarkFormatListItem benchmarks the formatListItem method
+func BenchmarkFormatListItem(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     false,
+		CommentPrefix: "# ",
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.formatListItem("", "-", "Sample list item text")
+	}
+}
+
+// BenchmarkFormatListItemNested benchmarks formatListItem with nested indentation
+func BenchmarkFormatListItemNested(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     false,
+		CommentPrefix: "# ",
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.formatListItem("    ", "-", "Nested list item")
+	}
+}
+
+// BenchmarkFormatListItemNumbered benchmarks formatListItem with numbered list
+func BenchmarkFormatListItemNumbered(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     false,
+		CommentPrefix: "# ",
+		IndentSize:    2,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.formatListItem("", "1.", "First item in list")
+	}
+}
+
+// BenchmarkApplyInlineFormatting benchmarks the applyInlineFormatting method
+func BenchmarkApplyInlineFormatting(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     false,
+		ParseMarkdown: true,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "This has **bold** and *italic* with [link](url) mixed in"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.applyInlineFormatting(input)
+	}
+}
+
+// BenchmarkApplyInlineFormattingWithColors benchmarks applyInlineFormatting with colors
+func BenchmarkApplyInlineFormattingWithColors(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     true,
+		ParseMarkdown: true,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := "This has **bold** and *italic* with [link](url) mixed in"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.applyInlineFormatting(input)
+	}
+}
+
+// BenchmarkApplyInlineFormattingComplex benchmarks applyInlineFormatting with complex input
+func BenchmarkApplyInlineFormattingComplex(b *testing.B) {
+	config := FormatterConfig{
+		UseColors:     false,
+		ParseMarkdown: true,
+	}
+	formatter := NewTerminalFormatter(config)
+	input := `This document has **multiple bold sections** and *several italic parts*.
+Check [this link](http://example.com) and [another](http://test.com).
+More **bold** text with *emphasis* and additional [reference](url).`
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.applyInlineFormatting(input)
+	}
+}
