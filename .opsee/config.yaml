@@ -1,111 +1,87 @@
-project:
-  name: how
-  type: CLI Application
-  description: AI-powered shell assistant that provides command suggestions, code
-    generation, and explanations from the terminal
-  language: Go
-  repository: https://github.com/Codilas/how
+architecture:
+    data_flow: |
+        User input (CLI args or interactive prompts) → Cobra command handler
+        → Configuration loaded via Viper → Internal business logic
+        → AI provider API calls → Response formatting and output
+    key_files:
+        - path: cmd/how/main.go
+          role: Application entry point, initializes root command
+        - path: internal/
+          role: Business logic for AI interactions, provider management, context handling
+    pattern: layered with cobra command structure
 codebase_map:
-  apps:
-  - name: how
-    path: cmd/how
-    description: Main CLI entry point
-  packages:
-  - name: cli
-    path: internal/cli
-    description: Cobra-based command interface, subcommands, and REPL loop
-  - name: config
-    path: internal/config
-    description: Configuration loading and management from YAML files
-  - name: context
-    path: internal/context
-    description: Context gathering - git info, shell history, project metadata
-  - name: manager
-    path: internal/manager
-    description: Provider factory and registration system for AI backends
-  - name: providers
-    path: pkg/providers
-    description: Pluggable interface for AI providers, utilities, and type definitions
-  - name: anthropic
-    path: pkg/providers/anthropic
-    description: Anthropic Claude API implementation with streaming support
-  - name: extractor
-    path: pkg/extractor
-    description: Command extraction from AI responses and text parsing
-  - name: text
-    path: pkg/text
-    description: Terminal formatting and output rendering
-  - name: version
-    path: pkg/version
-    description: Build version and metadata injection
-tech_stack:
-  language: Go 1.22.4
-  core_libraries:
-  - 'github.com/spf13/cobra: CLI framework'
-  - 'github.com/spf13/viper: Configuration management'
-  - 'github.com/AlecAivazis/survey: Interactive prompts'
-  - 'github.com/fatih/color: Terminal colors'
-  - 'github.com/briandowns/spinner: Loading spinners'
-  databases: null
-  external_services:
-  - Anthropic Claude API
-  build_tools:
-  - Make
-  - GoReleaser
-purpose:
-  goals:
-  - Provide AI-powered shell assistance directly from terminal
-  - Support multiple AI providers with pluggable architecture
-  - Gather context from shell environment for smarter responses
-  - Suggest safe and unsafe commands with descriptions
-  key_features:
-  - Context-aware prompts (git info, directory, shell history)
-  - Multi-provider support (Claude, extensible to others)
-  - Command extraction and safety warnings
-  - Streaming and buffered response modes
-  - Shell history integration
-  - Setup wizard for provider configuration
-  architecture_patterns:
-  - Provider pattern for extensible AI backends
-  - Cobra CLI command structure with subcommands
-  - Viper configuration management
-  - Factory pattern for provider creation
-  - Streaming channel-based responses
-development:
-  setup_commands:
-  - 'make setup-dev: Install dev dependencies and golangci-lint'
-  - 'go mod download: Download module dependencies'
-  dev_server: null
-  build_command: make build
-  run_command: make dev && ./bin/how <prompt>
-  essential_commands:
-  - 'make build: Compile binary to bin/how'
-  - 'make test: Run all tests'
-  - 'make fmt: Format code with gofmt'
-  - 'make deps: Tidy and download dependencies'
-verification:
-  test_command: make test
-  test_verbose: make test-race
-  type_check: null
-  lint: make lint
-  build: make build
+    apps:
+        how:
+            entry: main.go
+            path: cmd/how
+            purpose: Main CLI application entry point
+    packages:
+        api:
+            path: pkg/
+            purpose: Public-facing API packages for external consumers
+        core:
+            path: internal/
+            purpose: Internal business logic and AI provider integration
+    scripts:
+        install:
+            path: scripts/install.sh
+            purpose: Installation script for end users
+commands:
+    build: make build
+    dev: make dev
+    install: make install
+    setup: how setup - configure AI provider
+    test: make test
+common_tasks:
+    add_ai_provider:
+        - Create provider interface in internal/
+        - Implement provider with API client logic
+        - Add provider selection to setup wizard via survey
+        - Update configuration schema in viper setup
+    add_command:
+        - Create new command file in cmd/how/commands/
+        - Implement command handler using cobra.Command struct
+        - Register command with root command
+    modify_prompt_handling:
+        - Logic in internal/ for context collection and prompt building
+        - Modify prompt templates or context gathering functions
 conventions:
-  package_structure:
-  - 'cmd/*: Application entry points'
-  - 'internal/*: Private packages not exported'
-  - 'pkg/*: Public reusable packages'
-  naming:
-  - PascalCase for exported types and functions
-  - camelCase for unexported identifiers
-  - Provider implementations in their own subdirectories
-  code_patterns:
-  - Interfaces in providers/interface.go for extensibility
-  - Config structs with embedded types
-  - Error handling with early returns
-  - Context passed as function parameter for cancellation
-  key_files:
-  - 'internal/cli/root.go: Main command handler and provider orchestration'
-  - 'pkg/providers/interface.go: Provider interface definition'
-  - 'pkg/providers/anthropic/provider.go: Claude implementation'
-  - 'internal/config/config.go: Configuration structures'
-  - 'Makefile: Build and development targets'
+    naming:
+        constants: UPPER_SNAKE_CASE for exported, camelCase for unexported
+        files: snake_case or descriptive names
+        functions: PascalCase for exported, camelCase for unexported
+        packages: lowercase_package_names
+    patterns:
+        - Cobra command definitions map CLI arguments to handler functions
+        - Viper manages configuration from setup wizard and env vars
+        - Interactive input uses survey library for structured prompts
+        - AI providers abstracted behind common interface
+development:
+    build: make build
+    run: make dev and then ./bin/how [prompt]
+    setup:
+        - ensure go 1.22.4 installed
+        - make setup-dev
+project:
+    description: AI shell assistant for commands, explanations, and code generation from terminal
+    name: how
+    primary_language: go
+    type: cli
+    version: 1.22.4
+tech_stack:
+    configuration: viper (YAML, TOML, env vars)
+    framework: cobra CLI framework
+    key_libraries:
+        - name: cobra
+          purpose: Command-line interface framework
+        - name: survey
+          purpose: Interactive terminal prompts for user input
+        - name: viper
+          purpose: Configuration management and environment variable binding
+        - name: spinner
+          purpose: Terminal spinners for visual feedback during long operations
+        - name: color
+          purpose: Terminal color output for syntax highlighting
+        - name: gopkg.in/yaml.v3
+          purpose: YAML parsing for configuration files
+    runtime: go 1.22.4
