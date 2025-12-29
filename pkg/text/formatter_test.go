@@ -753,3 +753,1010 @@ at the end`
 		_ = formatter.cleanWhitespace(complexInput)
 	}
 }
+
+// ============================================================================
+// TESTS FOR parseCodeBlocks METHOD
+// ============================================================================
+
+// TestParseCodeBlocksDetection tests the detection of code blocks
+func TestParseCodeBlocksDetection(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		expectedBlocks int
+		expectedCode   int
+		expectedText   int
+	}{
+		{
+			name:           "Empty string",
+			input:          "",
+			expectedBlocks: 0,
+			expectedCode:   0,
+			expectedText:   0,
+		},
+		{
+			name:           "Text only, no code blocks",
+			input:          "This is plain text without code",
+			expectedBlocks: 1,
+			expectedCode:   0,
+			expectedText:   1,
+		},
+		{
+			name:           "Single code block",
+			input:          "```go\nfunc main() {}\n```",
+			expectedBlocks: 1,
+			expectedCode:   1,
+			expectedText:   0,
+		},
+		{
+			name:           "Multiple code blocks",
+			input:          "```go\nfunc main() {}\n```\n\nSome text\n\n```python\nprint('hello')\n```",
+			expectedBlocks: 3,
+			expectedCode:   2,
+			expectedText:   1,
+		},
+		{
+			name:           "Code block with text before and after",
+			input:          "Introduction text\n\n```js\nconst x = 1;\n```\n\nConclusion text",
+			expectedBlocks: 3,
+			expectedCode:   1,
+			expectedText:   2,
+		},
+		{
+			name:           "Multiple consecutive code blocks",
+			input:          "```go\ncode1\n```\n```python\ncode2\n```",
+			expectedBlocks: 2,
+			expectedCode:   2,
+			expectedText:   0,
+		},
+		{
+			name:           "Code block with no language specified",
+			input:          "```\nplain code\n```",
+			expectedBlocks: 1,
+			expectedCode:   1,
+			expectedText:   0,
+		},
+		{
+			name:           "Code block followed by text",
+			input:          "```\ncode\n```\nText after",
+			expectedBlocks: 2,
+			expectedCode:   1,
+			expectedText:   1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(FormatterConfig{})
+			blocks := formatter.parseCodeBlocks(tt.input)
+
+			if len(blocks) != tt.expectedBlocks {
+				t.Errorf("Expected %d blocks, got %d", tt.expectedBlocks, len(blocks))
+			}
+
+			codeCount := 0
+			textCount := 0
+			for _, block := range blocks {
+				if block.IsCode {
+					codeCount++
+				} else {
+					textCount++
+				}
+			}
+
+			if codeCount != tt.expectedCode {
+				t.Errorf("Expected %d code blocks, got %d", tt.expectedCode, codeCount)
+			}
+			if textCount != tt.expectedText {
+				t.Errorf("Expected %d text blocks, got %d", tt.expectedText, textCount)
+			}
+		})
+	}
+}
+
+// TestParseCodeBlocksLanguageIdentification tests language identification
+func TestParseCodeBlocksLanguageIdentification(t *testing.T) {
+	tests := []struct {
+		name             string
+		input            string
+		expectedLanguage string
+	}{
+		{
+			name:             "Go language",
+			input:            "```go\nfunc main() {}\n```",
+			expectedLanguage: "go",
+		},
+		{
+			name:             "Python language",
+			input:            "```python\nprint('hello')\n```",
+			expectedLanguage: "python",
+		},
+		{
+			name:             "JavaScript language",
+			input:            "```js\nconst x = 1;\n```",
+			expectedLanguage: "js",
+		},
+		{
+			name:             "TypeScript language",
+			input:            "```typescript\nconst x: number = 1;\n```",
+			expectedLanguage: "typescript",
+		},
+		{
+			name:             "Bash language",
+			input:            "```bash\necho 'hello'\n```",
+			expectedLanguage: "bash",
+		},
+		{
+			name:             "Rust language",
+			input:            "```rust\nfn main() {}\n```",
+			expectedLanguage: "rust",
+		},
+		{
+			name:             "C++ language",
+			input:            "```c++\nint main() {}\n```",
+			expectedLanguage: "c++",
+		},
+		{
+			name:             "C# language",
+			input:            "```csharp\nclass Program {}\n```",
+			expectedLanguage: "csharp",
+		},
+		{
+			name:             "SQL language",
+			input:            "```sql\nSELECT * FROM table;\n```",
+			expectedLanguage: "sql",
+		},
+		{
+			name:             "JSON language",
+			input:            "```json\n{\"key\": \"value\"}\n```",
+			expectedLanguage: "json",
+		},
+		{
+			name:             "YAML language",
+			input:            "```yaml\nkey: value\n```",
+			expectedLanguage: "yaml",
+		},
+		{
+			name:             "XML language",
+			input:            "```xml\n<tag>content</tag>\n```",
+			expectedLanguage: "xml",
+		},
+		{
+			name:             "No language specified",
+			input:            "```\nplain code\n```",
+			expectedLanguage: "",
+		},
+		{
+			name:             "Language with numbers",
+			input:            "```python3\nprint('hello')\n```",
+			expectedLanguage: "python3",
+		},
+		{
+			name:             "Language with hyphen",
+			input:            "```c-sharp\nclass Program {}\n```",
+			expectedLanguage: "c-sharp",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(FormatterConfig{})
+			blocks := formatter.parseCodeBlocks(tt.input)
+
+			if len(blocks) == 0 {
+				t.Fatal("Expected at least one block")
+			}
+
+			codeBlock := blocks[0]
+			if !codeBlock.IsCode {
+				t.Fatalf("Expected code block, got text block")
+			}
+
+			if codeBlock.Language != tt.expectedLanguage {
+				t.Errorf("Expected language %q, got %q", tt.expectedLanguage, codeBlock.Language)
+			}
+		})
+	}
+}
+
+// TestParseCodeBlocksContentExtraction tests correct content extraction
+func TestParseCodeBlocksContentExtraction(t *testing.T) {
+	tests := []struct {
+		name            string
+		input           string
+		expectedContent string
+	}{
+		{
+			name:            "Simple single line code",
+			input:           "```go\nfunc main() {}\n```",
+			expectedContent: "func main() {}",
+		},
+		{
+			name:            "Multi-line code block",
+			input:           "```python\ndef hello():\n    print('world')\n    return True\n```",
+			expectedContent: "def hello():\n    print('world')\n    return True",
+		},
+		{
+			name:            "Code with indentation",
+			input:           "```go\nif true {\n    fmt.Println(\"hello\")\n}\n```",
+			expectedContent: "if true {\n    fmt.Println(\"hello\")\n}",
+		},
+		{
+			name:            "Code with empty lines",
+			input:           "```javascript\nconst x = 1;\n\nconst y = 2;\n```",
+			expectedContent: "const x = 1;\n\nconst y = 2;",
+		},
+		{
+			name:            "Code with special characters",
+			input:           "```bash\necho \"Hello $USER\"\nls -la\n```",
+			expectedContent: "echo \"Hello $USER\"\nls -la",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(FormatterConfig{})
+			blocks := formatter.parseCodeBlocks(tt.input)
+
+			if len(blocks) == 0 {
+				t.Fatal("Expected at least one block")
+			}
+
+			codeBlock := blocks[0]
+			if !codeBlock.IsCode {
+				t.Fatal("Expected code block")
+			}
+
+			if codeBlock.Content != tt.expectedContent {
+				t.Errorf("Content mismatch\nExpected: %q\nGot: %q", tt.expectedContent, codeBlock.Content)
+			}
+		})
+	}
+}
+
+// TestParseCodeBlocksWithMixedContent tests mixed text and code blocks
+func TestParseCodeBlocksWithMixedContent(t *testing.T) {
+	input := `Here is an introduction to the code.
+
+\`\`\`go
+func main() {
+    fmt.Println("Hello")
+}
+\`\`\`
+
+And here is some explanation after the code.
+
+\`\`\`python
+def greet():
+    print("Hi")
+\`\`\`
+
+Final note.`
+
+	formatter := NewTerminalFormatter(FormatterConfig{})
+	blocks := formatter.parseCodeBlocks(input)
+
+	// Should have: text, code, text, code, text (5 blocks)
+	if len(blocks) < 3 {
+		t.Fatalf("Expected at least 3 blocks, got %d", len(blocks))
+	}
+
+	// Check first block is text
+	if blocks[0].IsCode {
+		t.Error("First block should be text")
+	}
+	if !strings.Contains(blocks[0].Content, "introduction") {
+		t.Error("First text block should contain 'introduction'")
+	}
+
+	// Check for code blocks
+	codeBlockCount := 0
+	for _, block := range blocks {
+		if block.IsCode {
+			codeBlockCount++
+		}
+	}
+
+	if codeBlockCount < 2 {
+		t.Errorf("Expected at least 2 code blocks, got %d", codeBlockCount)
+	}
+}
+
+// TestParseCodeBlocksEdgeCases tests edge cases
+func TestParseCodeBlocksEdgeCases(t *testing.T) {
+	tests := []struct {
+		name            string
+		input           string
+		shouldHaveCode  bool
+		expectedContent string
+	}{
+		{
+			name:            "Code block at start",
+			input:           "```go\ncode\n```\ntext",
+			shouldHaveCode:  true,
+			expectedContent: "code",
+		},
+		{
+			name:            "Code block at end",
+			input:           "text\n```go\ncode\n```",
+			shouldHaveCode:  true,
+			expectedContent: "code",
+		},
+		{
+			name:            "Code with extra whitespace",
+			input:           "```go\n\ncode\n\n```",
+			shouldHaveCode:  true,
+			expectedContent: "\ncode\n",
+		},
+		{
+			name:            "Code block with only whitespace",
+			input:           "```go\n   \n```",
+			shouldHaveCode:  true,
+			expectedContent: "   ",
+		},
+		{
+			name:            "Multiple language specs in same text",
+			input:           "Use ```go\nfor Go\n``` or ```python\nfor Python\n```",
+			shouldHaveCode:  true,
+			expectedContent: "for Go",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(FormatterConfig{})
+			blocks := formatter.parseCodeBlocks(tt.input)
+
+			hasCode := false
+			for _, block := range blocks {
+				if block.IsCode {
+					hasCode = true
+					if tt.expectedContent != "" && block.Content == tt.expectedContent {
+						return
+					}
+				}
+			}
+
+			if tt.shouldHaveCode && !hasCode {
+				t.Error("Expected code block but none found")
+			}
+		})
+	}
+}
+
+// TestParseCodeBlocksEmptyCode tests parsing empty code blocks
+func TestParseCodeBlocksEmptyCode(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		hasEmpty  bool
+		isCode    bool
+	}{
+		{
+			name:     "Empty code block",
+			input:    "```go\n```",
+			hasEmpty: true,
+			isCode:   true,
+		},
+		{
+			name:     "Empty code block with language",
+			input:    "```python\n```",
+			hasEmpty: true,
+			isCode:   true,
+		},
+		{
+			name:     "Code block with just newlines",
+			input:    "```\n\n\n```",
+			hasEmpty: true,
+			isCode:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(FormatterConfig{})
+			blocks := formatter.parseCodeBlocks(tt.input)
+
+			if len(blocks) == 0 {
+				t.Fatal("Expected at least one block")
+			}
+
+			block := blocks[0]
+			if block.IsCode != tt.isCode {
+				t.Errorf("Expected IsCode=%v, got %v", tt.isCode, block.IsCode)
+			}
+		})
+	}
+}
+
+// ============================================================================
+// TESTS FOR writeCodeBlock METHOD
+// ============================================================================
+
+// TestWriteCodeBlockBasic tests basic code block writing
+func TestWriteCodeBlockBasic(t *testing.T) {
+	tests := []struct {
+		name           string
+		code           string
+		language       string
+		config         FormatterConfig
+		shouldContain  []string
+		shouldNotContain []string
+	}{
+		{
+			name:     "Simple code with language",
+			code:     "func main() {}",
+			language: "go",
+			config: FormatterConfig{
+				CommentPrefix: "# ",
+				IndentSize:    2,
+				UseColors:     false,
+			},
+			shouldContain:  []string{"```go", "func main() {}", "```"},
+			shouldNotContain: []string{},
+		},
+		{
+			name:     "Code without language",
+			code:     "some code",
+			language: "",
+			config: FormatterConfig{
+				CommentPrefix: "# ",
+				IndentSize:    2,
+				UseColors:     false,
+			},
+			shouldContain:  []string{"some code"},
+			shouldNotContain: []string{"```"},
+		},
+		{
+			name:     "Multi-line code",
+			code:     "line1\nline2\nline3",
+			language: "python",
+			config: FormatterConfig{
+				CommentPrefix: "# ",
+				IndentSize:    2,
+				UseColors:     false,
+			},
+			shouldContain:  []string{"line1", "line2", "line3", "```python"},
+			shouldNotContain: []string{},
+		},
+		{
+			name:     "Code with special characters",
+			code:     "echo \"$VAR\"",
+			language: "bash",
+			config: FormatterConfig{
+				CommentPrefix: "# ",
+				IndentSize:    2,
+				UseColors:     false,
+			},
+			shouldContain:  []string{"echo", "$VAR", "```bash"},
+			shouldNotContain: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatter := NewTerminalFormatter(tt.config)
+			var result strings.Builder
+
+			formatter.writeCodeBlock(&result, tt.code, tt.language)
+			output := result.String()
+
+			for _, expected := range tt.shouldContain {
+				if !strings.Contains(output, expected) {
+					t.Errorf("Output should contain %q, but got:\n%s", expected, output)
+				}
+			}
+
+			for _, notExpected := range tt.shouldNotContain {
+				if strings.Contains(output, notExpected) {
+					t.Errorf("Output should not contain %q, but got:\n%s", notExpected, output)
+				}
+			}
+		})
+	}
+}
+
+// TestWriteCodeBlockLineNumbers tests line numbering
+func TestWriteCodeBlockLineNumbers(t *testing.T) {
+	tests := []struct {
+		name          string
+		code          string
+		showLineNums  bool
+		shouldContain []string
+	}{
+		{
+			name:         "Line numbers enabled",
+			code:         "line1\nline2\nline3",
+			showLineNums: true,
+			shouldContain: []string{"1:", "2:", "3:"},
+		},
+		{
+			name:         "Line numbers disabled",
+			code:         "line1\nline2\nline3",
+			showLineNums: false,
+			shouldContain: []string{"line1", "line2", "line3"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix:  "# ",
+				IndentSize:     2,
+				ShowLineNumbers: tt.showLineNums,
+				UseColors:      false,
+			}
+			formatter := NewTerminalFormatter(config)
+			var result strings.Builder
+
+			formatter.writeCodeBlock(&result, tt.code, "go")
+			output := result.String()
+
+			for _, expected := range tt.shouldContain {
+				if !strings.Contains(output, expected) {
+					t.Errorf("Output should contain %q when ShowLineNumbers=%v, but got:\n%s",
+						expected, tt.showLineNums, output)
+				}
+			}
+		})
+	}
+}
+
+// TestWriteCodeBlockIndentation tests indentation application
+func TestWriteCodeBlockIndentation(t *testing.T) {
+	tests := []struct {
+		name       string
+		indentSize int
+		code       string
+	}{
+		{
+			name:       "No indentation",
+			indentSize: 0,
+			code:       "code",
+		},
+		{
+			name:       "2-space indentation",
+			indentSize: 2,
+			code:       "code",
+		},
+		{
+			name:       "4-space indentation",
+			indentSize: 4,
+			code:       "code",
+		},
+		{
+			name:       "Tab indentation",
+			indentSize: 1,
+			code:       "multi\nline\ncode",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix:  "# ",
+				IndentSize:     tt.indentSize,
+				UseColors:      false,
+				ShowLineNumbers: false,
+			}
+			formatter := NewTerminalFormatter(config)
+			var result strings.Builder
+
+			formatter.writeCodeBlock(&result, tt.code, "python")
+			output := result.String()
+
+			lines := strings.Split(strings.TrimSpace(output), "\n")
+			for _, line := range lines {
+				if strings.HasPrefix(line, "# ") && !strings.HasPrefix(line, "# ```") {
+					// Check indentation is applied
+					content := strings.TrimPrefix(line, "# ")
+					expectedIndent := strings.Repeat(" ", tt.indentSize)
+					if tt.indentSize > 0 && !strings.HasPrefix(content, expectedIndent) {
+						t.Errorf("Expected indentation of %d spaces, line: %q", tt.indentSize, line)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestWriteCodeBlockCommentPrefix tests comment prefix application
+func TestWriteCodeBlockCommentPrefix(t *testing.T) {
+	tests := []struct {
+		name          string
+		prefix        string
+		shouldContain bool
+	}{
+		{
+			name:          "Default hash prefix",
+			prefix:        "# ",
+			shouldContain: true,
+		},
+		{
+			name:          "Custom arrow prefix",
+			prefix:        ">> ",
+			shouldContain: true,
+		},
+		{
+			name:          "Empty prefix",
+			prefix:        "",
+			shouldContain: false,
+		},
+		{
+			name:          "Colon prefix",
+			prefix:        ": ",
+			shouldContain: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: tt.prefix,
+				IndentSize:    2,
+				UseColors:     false,
+			}
+			formatter := NewTerminalFormatter(config)
+			var result strings.Builder
+
+			formatter.writeCodeBlock(&result, "code", "go")
+			output := result.String()
+
+			if tt.shouldContain && tt.prefix != "" {
+				if !strings.Contains(output, tt.prefix) {
+					t.Errorf("Output should contain prefix %q, got:\n%s", tt.prefix, output)
+				}
+			}
+		})
+	}
+}
+
+// TestWriteCodeBlockCompactMode tests compact mode formatting
+func TestWriteCodeBlockCompactMode(t *testing.T) {
+	tests := []struct {
+		name       string
+		compactMode bool
+		code       string
+	}{
+		{
+			name:        "Compact mode enabled",
+			compactMode: true,
+			code:        "code1\ncode2",
+		},
+		{
+			name:        "Compact mode disabled",
+			compactMode: false,
+			code:        "code1\ncode2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				IndentSize:    2,
+				CompactMode:   tt.compactMode,
+				UseColors:     false,
+			}
+			formatter := NewTerminalFormatter(config)
+			var result strings.Builder
+
+			formatter.writeCodeBlock(&result, tt.code, "python")
+			output := result.String()
+
+			// In non-compact mode, there should be trailing newline after code block
+			// In compact mode, there should not be extra newlines
+			if !tt.compactMode && !strings.HasSuffix(strings.TrimRight(output, "\n"), "```") {
+				// Should have blank line at end
+				lineCount := strings.Count(output, "\n")
+				if lineCount < 2 {
+					t.Errorf("Non-compact mode should have more newlines")
+				}
+			}
+		})
+	}
+}
+
+// TestWriteCodeBlockLanguages tests various programming languages
+func TestWriteCodeBlockLanguages(t *testing.T) {
+	languages := []string{
+		"go", "python", "javascript", "typescript", "bash", "rust",
+		"java", "cpp", "csharp", "ruby", "php", "sql", "json",
+		"yaml", "xml", "html", "css", "swift", "kotlin", "scala",
+	}
+
+	for _, lang := range languages {
+		t.Run(lang, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				IndentSize:    2,
+				UseColors:     false,
+			}
+			formatter := NewTerminalFormatter(config)
+			var result strings.Builder
+
+			code := "code snippet in " + lang
+			formatter.writeCodeBlock(&result, code, lang)
+			output := result.String()
+
+			expected := "```" + lang
+			if !strings.Contains(output, expected) {
+				t.Errorf("Output should contain %q, got:\n%s", expected, output)
+			}
+		})
+	}
+}
+
+// TestWriteCodeBlockWhitespaceHandling tests whitespace in code blocks
+func TestWriteCodeBlockWhitespaceHandling(t *testing.T) {
+	tests := []struct {
+		name     string
+		code     string
+		language string
+	}{
+		{
+			name:     "Leading and trailing whitespace",
+			code:     "  \n\ncode content\n\n  ",
+			language: "go",
+		},
+		{
+			name:     "Code with internal indentation",
+			code:     "if true {\n    return value\n}",
+			language: "js",
+		},
+		{
+			name:     "Code with tabs",
+			code:     "function test() {\n\t\treturn true;\n}",
+			language: "typescript",
+		},
+		{
+			name:     "Code with mixed whitespace",
+			code:     "  spaces\n\ttabs\n  mixed\t\t content",
+			language: "python",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				IndentSize:    2,
+				UseColors:     false,
+			}
+			formatter := NewTerminalFormatter(config)
+			var result strings.Builder
+
+			formatter.writeCodeBlock(&result, tt.code, tt.language)
+			output := result.String()
+
+			// Verify we get some output
+			if output == "" {
+				t.Error("Expected non-empty output")
+			}
+
+			// Verify code block markers are present for languages
+			if tt.language != "" {
+				if !strings.Contains(output, "```"+tt.language) {
+					t.Errorf("Missing language header for %s", tt.language)
+				}
+			}
+		})
+	}
+}
+
+// TestWriteCodeBlockEmptyCode tests handling of empty code
+func TestWriteCodeBlockEmptyCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		code     string
+		language string
+	}{
+		{
+			name:     "Empty string",
+			code:     "",
+			language: "go",
+		},
+		{
+			name:     "Only whitespace",
+			code:     "   \n  \n  ",
+			language: "python",
+		},
+		{
+			name:     "Only newlines",
+			code:     "\n\n",
+			language: "bash",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := FormatterConfig{
+				CommentPrefix: "# ",
+				IndentSize:    2,
+				UseColors:     false,
+			}
+			formatter := NewTerminalFormatter(config)
+			var result strings.Builder
+
+			formatter.writeCodeBlock(&result, tt.code, tt.language)
+			output := result.String()
+
+			// Should still have code block markers for language
+			if tt.language != "" {
+				if !strings.Contains(output, "```"+tt.language) {
+					t.Errorf("Empty code should still have language marker")
+				}
+			}
+		})
+	}
+}
+
+// TestWriteCodeBlockWithColors tests code block output with colors enabled
+func TestWriteCodeBlockWithColors(t *testing.T) {
+	config := FormatterConfig{
+		CommentPrefix: "# ",
+		IndentSize:    2,
+		UseColors:     true,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	var result strings.Builder
+	formatter.writeCodeBlock(&result, "func main() {}", "go")
+	output := result.String()
+
+	// Output should have content
+	if output == "" {
+		t.Error("Expected non-empty output with colors enabled")
+	}
+
+	// Should still contain code
+	if !strings.Contains(output, "main") {
+		t.Error("Output should contain the code content")
+	}
+}
+
+// TestWriteCodeBlockMultipleLines tests multi-line code formatting
+func TestWriteCodeBlockMultipleLines(t *testing.T) {
+	code := `func greet(name string) {
+    fmt.Printf("Hello, %s!\n", name)
+    return nil
+}`
+
+	config := FormatterConfig{
+		CommentPrefix:  "# ",
+		IndentSize:     2,
+		ShowLineNumbers: true,
+		UseColors:       false,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	var result strings.Builder
+	formatter.writeCodeBlock(&result, code, "go")
+	output := result.String()
+
+	// Check each line is present
+	lines := strings.Split(code, "\n")
+	for i, line := range lines {
+		if line != "" && !strings.Contains(output, line) {
+			t.Errorf("Line %d not found in output: %q", i+1, line)
+		}
+	}
+
+	// Check line numbers
+	if !strings.Contains(output, "1:") || !strings.Contains(output, "2:") {
+		t.Error("Line numbers should be present")
+	}
+}
+
+// BenchmarkParseCodeBlocks benchmarks the parseCodeBlocks method
+func BenchmarkParseCodeBlocks(b *testing.B) {
+	input := `Introduction text
+
+\`\`\`go
+func main() {
+    fmt.Println("hello")
+}
+\`\`\`
+
+Middle section
+
+\`\`\`python
+def test():
+    return True
+\`\`\`
+
+Conclusion`
+
+	formatter := NewTerminalFormatter(FormatterConfig{})
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.parseCodeBlocks(input)
+	}
+}
+
+// BenchmarkParseCodeBlocksComplex benchmarks parseCodeBlocks with complex input
+func BenchmarkParseCodeBlocksComplex(b *testing.B) {
+	input := strings.Repeat(`Text content\n\n\`\`\`go\nfunc test() {}\n\`\`\`\n\n`, 10)
+
+	formatter := NewTerminalFormatter(FormatterConfig{})
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = formatter.parseCodeBlocks(input)
+	}
+}
+
+// BenchmarkWriteCodeBlock benchmarks the writeCodeBlock method
+func BenchmarkWriteCodeBlock(b *testing.B) {
+	code := `func main() {
+    fmt.Println("Hello, World!")
+    for i := 0; i < 10; i++ {
+        fmt.Printf("%d\n", i)
+    }
+}`
+
+	config := FormatterConfig{
+		CommentPrefix:   "# ",
+		IndentSize:      2,
+		UseColors:       false,
+		ShowLineNumbers: false,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var result strings.Builder
+		formatter.writeCodeBlock(&result, code, "go")
+	}
+}
+
+// BenchmarkWriteCodeBlockWithLineNumbers benchmarks writeCodeBlock with line numbers
+func BenchmarkWriteCodeBlockWithLineNumbers(b *testing.B) {
+	code := `line1
+line2
+line3
+line4
+line5
+line6
+line7
+line8
+line9
+line10`
+
+	config := FormatterConfig{
+		CommentPrefix:   "# ",
+		IndentSize:      2,
+		UseColors:       false,
+		ShowLineNumbers: true,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var result strings.Builder
+		formatter.writeCodeBlock(&result, code, "python")
+	}
+}
+
+// BenchmarkWriteCodeBlockWithColors benchmarks writeCodeBlock with colors
+func BenchmarkWriteCodeBlockWithColors(b *testing.B) {
+	code := `const main = async () => {
+    console.log("hello");
+    return true;
+};`
+
+	config := FormatterConfig{
+		CommentPrefix:   "# ",
+		IndentSize:      2,
+		UseColors:       true,
+		ShowLineNumbers: false,
+	}
+	formatter := NewTerminalFormatter(config)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var result strings.Builder
+		formatter.writeCodeBlock(&result, code, "javascript")
+	}
+}
