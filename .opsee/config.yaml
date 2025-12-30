@@ -1,111 +1,125 @@
-project:
-  name: how
-  type: CLI Application
-  description: AI-powered shell assistant that provides command suggestions, code
-    generation, and explanations from the terminal
-  language: Go
-  repository: https://github.com/Codilas/how
+Now I have enough information to generate the .opsee configuration file: null
+architecture:
+    data_flow: |
+        CLI (cobra) receives user prompt -> Context gatherer collects environment info ->
+        Manager selects and invokes AI provider -> Provider sends request to API ->
+        Response is formatted by text formatter -> Commands extracted and displayed
+    key_files:
+        - path: cmd/how/main.go
+          role: Entry point - calls cli.Execute()
+        - path: internal/cli/root.go
+          role: Main command handler - orchestrates prompt flow, add new flags here
+        - path: internal/config/config.go
+          role: Config structs and load/save - modify for new config options
+        - path: pkg/providers/interface.go
+          role: Provider interface definition - implement for new AI providers
+        - path: internal/manager/factory.go
+          role: Provider registration - register new providers here
+    pattern: layered with internal/pkg separation
 codebase_map:
-  apps:
-  - name: how
-    path: cmd/how
-    description: Main CLI entry point
-  packages:
-  - name: cli
-    path: internal/cli
-    description: Cobra-based command interface, subcommands, and REPL loop
-  - name: config
-    path: internal/config
-    description: Configuration loading and management from YAML files
-  - name: context
-    path: internal/context
-    description: Context gathering - git info, shell history, project metadata
-  - name: manager
-    path: internal/manager
-    description: Provider factory and registration system for AI backends
-  - name: providers
-    path: pkg/providers
-    description: Pluggable interface for AI providers, utilities, and type definitions
-  - name: anthropic
-    path: pkg/providers/anthropic
-    description: Anthropic Claude API implementation with streaming support
-  - name: extractor
-    path: pkg/extractor
-    description: Command extraction from AI responses and text parsing
-  - name: text
-    path: pkg/text
-    description: Terminal formatting and output rendering
-  - name: version
-    path: pkg/version
-    description: Build version and metadata injection
-tech_stack:
-  language: Go 1.22.4
-  core_libraries:
-  - 'github.com/spf13/cobra: CLI framework'
-  - 'github.com/spf13/viper: Configuration management'
-  - 'github.com/AlecAivazis/survey: Interactive prompts'
-  - 'github.com/fatih/color: Terminal colors'
-  - 'github.com/briandowns/spinner: Loading spinners'
-  databases: null
-  external_services:
-  - Anthropic Claude API
-  build_tools:
-  - Make
-  - GoReleaser
-purpose:
-  goals:
-  - Provide AI-powered shell assistance directly from terminal
-  - Support multiple AI providers with pluggable architecture
-  - Gather context from shell environment for smarter responses
-  - Suggest safe and unsafe commands with descriptions
-  key_features:
-  - Context-aware prompts (git info, directory, shell history)
-  - Multi-provider support (Claude, extensible to others)
-  - Command extraction and safety warnings
-  - Streaming and buffered response modes
-  - Shell history integration
-  - Setup wizard for provider configuration
-  architecture_patterns:
-  - Provider pattern for extensible AI backends
-  - Cobra CLI command structure with subcommands
-  - Viper configuration management
-  - Factory pattern for provider creation
-  - Streaming channel-based responses
-development:
-  setup_commands:
-  - 'make setup-dev: Install dev dependencies and golangci-lint'
-  - 'go mod download: Download module dependencies'
-  dev_server: null
-  build_command: make build
-  run_command: make dev && ./bin/how <prompt>
-  essential_commands:
-  - 'make build: Compile binary to bin/how'
-  - 'make test: Run all tests'
-  - 'make fmt: Format code with gofmt'
-  - 'make deps: Tidy and download dependencies'
-verification:
-  test_command: make test
-  test_verbose: make test-race
-  type_check: null
-  lint: make lint
-  build: make build
+    directories:
+        cmd/how:
+            entry: main.go
+            path: cmd/how
+            purpose: Application entry point
+        internal/cli:
+            path: internal/cli
+            purpose: CLI commands and user interaction (cobra commands, setup wizard)
+        internal/config:
+            path: internal/config
+            purpose: Configuration loading/saving with viper
+        internal/context:
+            path: internal/context
+            purpose: Context gathering (git, files, history, project detection)
+        internal/manager:
+            path: internal/manager
+            purpose: AI provider lifecycle management and selection
+        pkg/extractor:
+            path: pkg/extractor
+            purpose: Command extraction from AI responses
+        pkg/providers:
+            path: pkg/providers
+            purpose: Provider interface and types (reusable across projects)
+        pkg/providers/anthropic:
+            path: pkg/providers/anthropic
+            purpose: Anthropic Claude API implementation
+        pkg/text:
+            path: pkg/text
+            purpose: Terminal text formatting with markdown support
+        pkg/version:
+            path: pkg/version
+            purpose: Version info (injected at build time)
+commands:
+    build: make build
+    clean: make clean
+    dev: make dev
+    fmt: make fmt
+    install: make install
+    lint: make lint
+    release: make release
+    test: make test
+common_tasks:
+    add_cli_command:
+        - Create internal/cli/<command>.go with cobra.Command
+        - Add to rootCmd in internal/cli/root.go init()
+    add_config_option:
+        - Add field to appropriate struct in internal/config/config.go
+        - Add yaml/json tags for serialization
+        - Update setup wizard if user-configurable
+    add_context_source:
+        - Create internal/context/<source>.go with gather function
+        - Call from GatherAll() in internal/context/context.go
+        - Add field to providers.Context in pkg/providers/types.go
+    add_new_provider:
+        - Create pkg/providers/<name>/provider.go implementing providers.Provider
+        - Add templates.go for system prompts if needed
+        - Register in internal/cli/root.go initConfig() via manager.RegisterProvider()
+        - Add setup flow in internal/cli/setup.go switch statement
 conventions:
-  package_structure:
-  - 'cmd/*: Application entry points'
-  - 'internal/*: Private packages not exported'
-  - 'pkg/*: Public reusable packages'
-  naming:
-  - PascalCase for exported types and functions
-  - camelCase for unexported identifiers
-  - Provider implementations in their own subdirectories
-  code_patterns:
-  - Interfaces in providers/interface.go for extensibility
-  - Config structs with embedded types
-  - Error handling with early returns
-  - Context passed as function parameter for cancellation
-  key_files:
-  - 'internal/cli/root.go: Main command handler and provider orchestration'
-  - 'pkg/providers/interface.go: Provider interface definition'
-  - 'pkg/providers/anthropic/provider.go: Claude implementation'
-  - 'internal/config/config.go: Configuration structures'
-  - 'Makefile: Build and development targets'
+    file_organization: |
+        internal/cli/ - one file per command (root.go, setup.go, history.go)
+        internal/context/ - one file per context type (git.go, project.go)
+        pkg/providers/<name>/ - provider implementation with provider.go and templates.go
+    naming:
+        constants: camelCase or PascalCase
+        files: lowercase single word or snake_case
+        functions: camelCase for private, PascalCase for exported
+        packages: lowercase single word
+    patterns:
+        - internal/ for application-specific code, pkg/ for reusable libraries
+        - Providers implement the providers.Provider interface with 6 methods
+        - New providers registered via manager.RegisterProvider() in initConfig()
+        - Config structs use yaml and json tags for serialization
+        - Errors wrapped with fmt.Errorf and %w verb
+        - HTTP clients created with explicit timeouts
+development:
+    run: make dev && ./bin/how 'test prompt'
+    setup:
+        - make deps
+        - make setup-dev
+project:
+    description: AI-powered shell assistant for commands, explanations, and code generation
+    framework: cobra
+    name: how
+    primary_language: go
+    type: cli
+tech_stack:
+    framework: spf13/cobra for CLI
+    key_libraries:
+        - name: spf13/cobra
+          purpose: CLI command structure and argument parsing
+        - name: spf13/viper
+          purpose: Configuration management with YAML and env vars
+        - name: AlecAivazis/survey/v2
+          purpose: Interactive terminal prompts for setup wizard
+        - name: fatih/color
+          purpose: Colored terminal output
+        - name: briandowns/spinner
+          purpose: Loading spinner during AI requests
+        - name: gopkg.in/yaml.v3
+          purpose: YAML serialization for config files
+    runtime: go 1.22.4
+testing:
+    framework: go test
+    location: tests alongside source files (*_test.go)
+    run: make test
